@@ -12,7 +12,6 @@ string? basePath = Path.GetDirectoryName(assemblyLocation);
 if (string.IsNullOrWhiteSpace(basePath))
 {
     return -1;
-    
 }
 
 var configFiles = new ConfigurationBuilder()
