@@ -20,6 +20,24 @@
   <ItemGroup>
     <Compile Remove="MonitorHelpers\Interfaces\ISource.cs" />
     <Compile Remove="ContextHelpers\CxtModels.cs" />
+    <Compile Include="obj\Debug\net7.0\.NETCoreApp,Version=v7.0.AssemblyAttributes.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="obj\Debug\net7.0\apphost.exe" />
+    <Content Include="obj\Debug\net7.0\MDR_Coder.AssemblyInfoInputs.cache" />
+    <Content Include="obj\Debug\net7.0\MDR_Coder.assets.cache" />
+    <Content Include="obj\Debug\net7.0\MDR_Coder.csproj.AssemblyReference.cache" />
+    <Content Include="obj\Debug\net7.0\MDR_Coder.csproj.CopyComplete" />
+    <Content Include="obj\Debug\net7.0\MDR_Coder.csproj.CoreCompileInputs.cache" />
+    <Content Include="obj\Debug\net7.0\MDR_Coder.csproj.FileListAbsolute.txt" />
+    <Content Include="obj\Debug\net7.0\MDR_Coder.dll" />
+    <Content Include="obj\Debug\net7.0\MDR_Coder.genruntimeconfig.cache" />
+    <Content Include="obj\Debug\net7.0\MDR_Coder.pdb" />
+    <Content Include="obj\MDR_Coder.csproj.nuget.dgspec.json" />
+    <Content Include="obj\project.assets.json" />
+    <Content Include="obj\project.nuget.cache" />
+    <Content Include="obj\project.packagespec.json" />
   </ItemGroup>
 
 </Project>
