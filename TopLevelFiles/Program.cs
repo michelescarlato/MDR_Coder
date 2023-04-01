@@ -58,7 +58,7 @@ if (paramsCheck.ParseError || paramsCheck.ValidityError)
 {
     // End program, parameter errors should have been logged
     // in a 'no source' file by the ParameterChecker class.
-
+    
     return -1;
 }
 
