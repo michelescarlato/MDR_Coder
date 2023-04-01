@@ -20,6 +20,10 @@
   <ItemGroup>
     <Compile Remove="MonitorHelpers\Interfaces\ISource.cs" />
     <Compile Remove="ContextHelpers\CxtModels.cs" />
+    <Compile Remove="TopLevelFiles\TestCoder.cs" />
+    <Compile Remove="TestingHelpers\Interfaces\ITestingDataLayer.cs" />
+    <Compile Remove="TestingHelpers\TestingDataLayer.cs" />
+    <Compile Remove="ContextHelpers\CxtEntry.cs" />
   </ItemGroup>
 
 </Project>

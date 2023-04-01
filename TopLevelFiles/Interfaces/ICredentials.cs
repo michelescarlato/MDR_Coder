@@ -7,5 +7,5 @@ public interface ICredentials
     string Username { get; set; }
     int Port { get; set; }
 
-    string GetConnectionString(string database_name, int harvest_type_id);
+    string GetConnectionString(string database_name);
 }

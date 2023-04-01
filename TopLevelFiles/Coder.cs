@@ -45,86 +45,106 @@ public class Coder
     {
         // Obtain source details, augment with connection string for this database.
         // Set up sf monitor tables as foreign tables, temporarily.
-        // Recreate ad tables if necessary.
         
         Credentials creds = _monDataLayer.Credentials;
-        //source.db_conn = creds.GetConnectionString(source.database_name!, false);
+        source.db_conn = creds.GetConnectionString(source.database_name!);
         _loggingHelper.LogStudyHeader(opts, "For source: " + source.id + ": " + source.database_name!);
         _loggingHelper.LogHeader("Setup");
        
-        //ImportBuilder ib = new ImportBuilder(source, _loggingHelper);
-        //DataTransferrer dataTransferrer = new DataTransferrer(source, _loggingHelper);
-        //dataTransferrer.EstablishForeignMonTables(creds);
+        CodingBuilder cb = new(source, opts, _loggingHelper);
+        cb.EstablishContextForeignTables(creds);
         _loggingHelper.LogLine("Foreign (mon) tables established in database");
-        if (opts.RebuildAdTables is true)
-        {
-            //AdBuilder adb = new AdBuilder(source, _loggingHelper);
-            //adb.BuildNewAdTables();
-        }
+        cb.EstablishTempNamesTable();
         
-        // Create and fill temporary tables to hold ids and edit statuses  
-        // of new, edited, deleted studies and data objects.
-
-        _loggingHelper.LogHeader("Start Import Process");
-        _loggingHelper.LogHeader("Create and fill diff tables");
-        //ib.CreateImportTables();
-        bool countDeleted = _monDataLayer.CheckIfFullHarvest(source.id);
-        //ib.FillImportTables(countDeleted);
-        _loggingHelper.LogDiffs(source);
-
-        // Create import event log record and start 
-        // the data transfer proper...
-
-        int importId = _monDataLayer.GetNextImportEventId();
-        //ImportEvent import = ib.CreateImportEvent(importId);
-
-        // Consider new studies, record dates, edited studies and / or objects,
-        // and any deleted studies / objects
-
-        _loggingHelper.LogHeader("Adding new data");
-        if (source.has_study_tables is true)
-        {
-           //dataTransferrer.AddNewStudies(importId);
-        }
-        //dataTransferrer.AddNewDataObjects(importId);
-
-        _loggingHelper.LogHeader("Editing existing data where necessary");
-        if (source.has_study_tables is true)
-        {
-            //ataTransferrer.UpdateEditedStudyData(importId);
-        }
-        //dataTransferrer.UpdateEditedDataObjectData(importId);
-
-        _loggingHelper.LogHeader("Updating dates of data");
-        //dataTransferrer.UpdateDatesOfData();
+        // If pubmed (or includes pubmed, as with expected test data), do these updates first.
         
-        _loggingHelper.LogHeader("Deleting data no longer present in source");
-        if (source.has_study_tables is true)
+        if (source.id == 100135 || source.id == 999999)
         {
-            //dataTransferrer.RemoveDeletedStudyData(importId);
+            cb.ObtainPublisherInformation();
+            cb.ApplyPublisherData();
+            _loggingHelper.LogLine("Updating Publisher Info\n");
         }
-        //dataTransferrer.RemoveDeletedDataObjectData(importId);
 
+        // Update and standardise organisation ids and names
+
+        if (source.has_study_tables is true || source.source_type == "test")
+        {
+            cb.UpdateStudyIdentifiers();
+            _loggingHelper.LogLine("Study identifier orgs updated");
+
+            if (source.has_study_organisations is true)
+            {
+                cb.UpdateStudyOrgs();
+                _loggingHelper.LogLine("Study contributor orgs updated");
+            }
+            if (source.has_study_people is true)
+            {
+                cb.UpdateStudyPeople();
+                _loggingHelper.LogLine("Study contributor orgs updated");
+            }
+            
+            cb.StoreUnMatchedOrgNamesForStudies();
+            _loggingHelper.LogLine("Unmatched org names for studies stored");
+            
+            if (source.has_study_countries is true)
+            {
+                cb.UpdateStudyCountries();
+                _loggingHelper.LogLine("Study country names and codes updated");
+            }
+            if (source.has_study_locations is true)
+            {
+                cb.UpdateStudyLocations();
+                _loggingHelper.LogLine("Study location names and codes updated");
+            }
+            
+            cb.StoreUnMatchedCountriesForStudies();
+            _loggingHelper.LogLine("Unmatched country names for studies stored");
+            
+            if (source.has_study_iec is true)
+            {
+                cb.UpdateStudyIEC();
+                _loggingHelper.LogLine("Study inclusion and exclusion criteria updated");
+            }
+        }
+
+        if (source.source_type == "object" || source.source_type == "test")
+        {
+            // works at present in the context of PubMed - may need changing 
+
+            cb.UpdateObjectIdentifiers();
+            _loggingHelper.LogLine("Object identifier orgs updated");
+
+            cb.UpdateObjectPeople();
+            _loggingHelper.LogLine("Object contributor orgs updated");
+            
+            cb.UpdateObjectOrganisations();
+            _loggingHelper.LogLine("Object contributor orgs updated");
+
+            cb.StoreUnMatchedNamesForObjects();
+            _loggingHelper.LogLine("Unmatched org names for objects stored");
+        }
+
+        cb.UpdateDataObjectOrgs();
+        _loggingHelper.LogLine("Data object managing orgs updated");
+        
+        cb.UpdateObjectInstanceOrgs();
+        _loggingHelper.LogLine("Data object instance managing orgs updated");
+
+        cb.StoreUnMatchedNamesForDataObjects();
+        _loggingHelper.LogLine("Unmatched org names in data objects stored");
+
+        // Update and standardise topic ids and names
+        
+        cb.UpdateConditions(source.source_type!);
+        _loggingHelper.LogLine("Conditions data updated");
+        
+        cb.UpdateTopics(source.source_type!);
+        _loggingHelper.LogLine("Topic data updated");
+        
         // Tidy up - 
-        // Update the 'date imported' record in the mon.source data tables
-        // Affects all records with status 1, 2 or 3 (non-test imports only)   
-        // Remove foreign tables
-        // Store import event for non-test imports.      
-        
-        _loggingHelper.LogHeader("Tidy up and finish");
-        if (source.has_study_tables is true)
-        {
-            _monDataLayer.UpdateStudiesLastImportedDate(importId, source.id);
-        }
-        else
-        {
-            // only do the objects table if there are no studies (e.g. PubMed)
-            _monDataLayer.UpdateObjectsLastImportedDate(importId, source.id);
-        }
-        //dataTransferrer.DropForeignMonTables();
+        cb.DropTempTables();
+        cb.DropContextForeignTables();
         _loggingHelper.LogLine("Foreign (mon) tables removed from database");    
-        //_monDataLayer.StoreImportEvent(import);
-
     } 
 }
 

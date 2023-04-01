@@ -5,19 +5,21 @@ namespace MDR_Coder
 { 
     public class TopicHelper
     {
-        Source _source;
-        string _db_conn;
-        string _source_type;
-        int study_rec_count = 0;
-        int object_rec_count = 0;
+        private readonly Source _source;
+        private readonly string _db_conn;
+        private readonly bool _nonCodedOnly;
+        private readonly string _source_type;
+        private readonly ILoggingHelper _loggingHelper;        
+        
+        private int study_rec_count = 0;
+        private int object_rec_count = 0;
 
-        ILoggingHelper _loggingHelper;
-
-        public TopicHelper(Source source, ILoggingHelper logger)
+        public TopicHelper(Source source, bool nonCodedOnly, ILoggingHelper logger)
         {
             _source = source;
-            _db_conn = source.db_conn;
-            _source_type = source.source_type;
+            _db_conn = source.db_conn ?? "";
+            _nonCodedOnly = nonCodedOnly;
+            _source_type = source.source_type ?? "";
             _loggingHelper = logger;
         }
 
@@ -34,10 +36,15 @@ namespace MDR_Coder
             string sql_count_string = @"select count(*) from " + schema + ".";
             sql_count_string += source_type == "study" ? "study_topics;" : "object_topics;";
 
-            using (var conn = new NpgsqlConnection(_db_conn))
-            {
-                return conn.ExecuteScalar<int>(sql_count_string);
-            }
+            using var conn = new NpgsqlConnection(_db_conn);
+            return conn.ExecuteScalar<int>(sql_count_string);
+        }
+        
+        private int GetConditionCount(string schema)
+        {
+            string sql_count_string = @"select count(*) from " + schema + ".study_conditions";
+            using var conn = new NpgsqlConnection(_db_conn);
+            return conn.ExecuteScalar<int>(sql_count_string);
         }
 
 
@@ -63,7 +70,7 @@ namespace MDR_Coder
             }
             else if (_source_type.ToLower() == "study" && _source.has_study_topics is true)
             {
-                study_rec_count = GetTopicCount("study", "sd");
+                study_rec_count = GetTopicCount("study", "ad");
 
                 delete_meaningless_cats("study", "sd", study_rec_count);
                 identify_geographic("study", "sd", study_rec_count);
@@ -72,7 +79,7 @@ namespace MDR_Coder
             }
             else if (_source_type.ToLower() == "object")
             {
-                object_rec_count = GetTopicCount("object", "sd");
+                object_rec_count = GetTopicCount("object", "ad");
 
                 delete_meaningless_cats("object", "sd", object_rec_count);
                 identify_geographic("object", "sd", object_rec_count);  
@@ -242,7 +249,6 @@ namespace MDR_Coder
                                 : ".object_topics t ";
             sql_string += @" set mesh_code = m.code,
                              mesh_value = m.term,
-                             mesh_coded = true
                              from context_ctx.mesh_lookup m
                              where lower(t.original_value) = m.entry";
             try
@@ -271,6 +277,42 @@ namespace MDR_Coder
             }
         }
 
+        
+        public void icd_match_conditions(string source_type, string schema, int rec_count)
+        {
+            // Can be difficult to do ths with large datasets.
+            int rec_batch = 500000;
+
+            string sql_string = @"Update " + schema + @".study_conditions t
+                             set icd_code = m.code,
+                             icd_name = m.term,
+                             from context_ctx.icd_lookup m
+                             where lower(t.original_value) = m.entry ";
+            try
+            {
+                if (rec_count > rec_batch)
+                {
+                    for (int r = 1; r <= rec_count; r += rec_batch)
+                    {
+                        string batch_sql_string = sql_string + " and id >= " + r.ToString() + " and id < " + (r + rec_batch).ToString();
+                        ExecuteSQL(batch_sql_string);
+                        string feedback = "Updating " + source_type + " topic codes - " + r.ToString() + " to ";
+                        feedback += (r + rec_batch < rec_count) ? (r + rec_batch).ToString() : rec_count.ToString();
+                        _loggingHelper.LogLine(feedback);
+                    }
+                }
+                else
+                {
+                    ExecuteSQL(sql_string);
+                    _loggingHelper.LogLine("Updating " + source_type + " topic codes - as a single batch");
+                }
+            }
+            catch (Exception e)
+            {
+                string res = e.Message;
+                _loggingHelper.LogError("In update_topics: " + res);
+            }
+        }
 
         public void mesh_remove_duplicates(string source_type, string schema, int rec_count)
         {
@@ -371,6 +413,12 @@ namespace MDR_Coder
 
         }
 
+        public void process_conditions()
+        {
+            study_rec_count = GetConditionCount("ad");
+            icd_match_conditions("study", "sd", study_rec_count);
+            // icd_remove_duplicates("study", "sd", study_rec_count);  // not sure if required
+        }
 
         public void store_unmatched_topic_values(string source_type, int source_id)
         {
@@ -386,6 +434,20 @@ namespace MDR_Coder
                              group by t.original_value;";
             ExecuteSQL(sql_string);
             _loggingHelper.LogLine("Storing topic codes not matched to MESH codes");
+        }
+        
+        
+        public void store_unmatched_condition_values(string source_type, int source_id)
+        {
+            string sql_string = @"delete from context_ctx.to_match_conditions where source_id = "
+                                + source_id + @";
+            insert into context_ctx.to_match_conditions (source_id, original_value, number_of) 
+            select " + source_id + @", original_value, count(original_value) ";
+            sql_string += @" from sd.study_conditions t 
+                             where t.icd_code is null 
+                             group by t.original_value;";
+            ExecuteSQL(sql_string);
+            _loggingHelper.LogLine("Storing condition codes not matched to ICD codes");
         }
     }
 }

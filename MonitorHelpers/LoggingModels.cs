@@ -21,12 +21,16 @@ public class Source
     public string? local_file_prefix { get; set; }
     public bool? has_study_tables { get; set; }
     public bool? has_study_topics { get; set; }
+    public bool? has_study_conditions { get; }
     public bool? has_study_features { get; set; }
-    public bool? has_study_contributors { get; set; }
-    public bool? has_study_countries { get; set; }
+    public bool? has_study_iec{ get; }
+    public string? study_iec_storage_type { get; }
+    public bool? has_study_organisations { get; }
+    public bool? has_study_people { get; }
     public bool? has_study_references { get; set; }
     public bool? has_study_relationships { get; set; }
     public bool? has_study_links { get; set; }
+    public bool? has_study_countries { get; set; }
     public bool? has_study_locations { get; set; }
     public bool? has_study_ipd_available { get; set; }
     public bool? has_object_datasets { get; set; }
@@ -34,6 +38,7 @@ public class Source
     public bool? has_object_relationships { get; set; }
     public bool? has_object_rights { get; set; }
     public bool? has_object_pubmed_set { get; set; }
+    public bool? has_object_doi_set { get; }
 }
 
 

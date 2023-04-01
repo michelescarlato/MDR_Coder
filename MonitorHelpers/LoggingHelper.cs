@@ -19,8 +19,8 @@ public class LoggingHelper : ILoggingHelper
             .AddJsonFile("appsettings.json")
             .Build();
 
-        _logfileStartOfPath = settings["logfilepath"] ?? "";
-        _summaryLogfileStartOfPath = settings["summaryfilepath"] ?? "";
+        _logfileStartOfPath = settings["logFilePath"] ?? "";
+        _summaryLogfileStartOfPath = settings["summaryFilePath"] ?? "";
     }
 
     public string LogFilePath => _logfilePath;
@@ -74,7 +74,7 @@ public class LoggingHelper : ILoggingHelper
 
     public void LogStudyHeader(Options opts, string dbLine)
     {
-        string dividerLine = opts.UsingTestData is true ? new string('-', 70) : new string('=', 70);
+        string dividerLine = new string('=', 70);
         LogLine("");
         LogLine(dividerLine);
         LogLine(dbLine);
@@ -132,9 +132,7 @@ public class LoggingHelper : ILoggingHelper
             }
         }
 
-        LogLine("Rebuild AD tables is: " + opts.RebuildAdTables);
-        LogLine("Using test data is: " + opts.UsingTestData);
-        LogLine("Creating test report is: " + opts.CreateTestReport);
+        LogLine("Recoding all data: " + opts.RecodeAll);
         LogLine("");
     }
 
@@ -156,7 +154,7 @@ public class LoggingHelper : ILoggingHelper
         swSummary.Close();
     }
 
-
+    /*
     public void LogTableStatistics(Source s, string schema)
     {
         // Gets and logs record count for each table in the ad schema of the database
@@ -239,6 +237,7 @@ public class LoggingHelper : ILoggingHelper
         GetObjectStats(dbConn, "atts");
     }
 
+    */
     
     private string GetTableRecordCount(string dbConn, string tableName)
     {

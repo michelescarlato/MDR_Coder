@@ -20,9 +20,6 @@ public interface ILoggingHelper
 
     void CloseLog();   
     
-    void LogTableStatistics(Source s, string schema);
-    void LogDiffs(Source s);
-    
     string GetTableRecordCount(string db_conn, string schema, string table_name);
 }
 

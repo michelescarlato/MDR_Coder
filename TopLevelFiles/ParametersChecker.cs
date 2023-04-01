@@ -1,21 +1,14 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using CommandLine;
-
+﻿using CommandLine;
 namespace MDR_Coder;
 
 internal class ParameterChecker 
 {
     private readonly ILoggingHelper _loggingHelper;
     private readonly IMonDataLayer _monDataLayer;
-    private readonly ITestingDataLayer _testRepo;
 
-    public ParameterChecker(IMonDataLayer monDataLayer, ITestingDataLayer testRepo, 
-        ILoggingHelper loggingHelper)
+    public ParameterChecker(IMonDataLayer monDataLayer, ILoggingHelper loggingHelper)
     {
         _monDataLayer = monDataLayer;
-        _testRepo = testRepo;
         _loggingHelper = loggingHelper;
     }
     
@@ -46,38 +39,23 @@ internal class ParameterChecker
 
         try
         {
-            if (opts.UsingTestData is true)
+            if (opts.SourceIds?.Any() is not true)
             {
-                // Set up array of source ids to reflect
-                // those in the test data set.
-
-                opts.SourceIds = _testRepo.ObtainTestSourceIDs();
-                return new ParamsCheckResult(false, false, opts);;     // Should always be able to run
+                throw new ArgumentException("No source id provided");
             }
-            else if (opts.CreateTestReport is true)
+
+            foreach (int sourceId in opts.SourceIds)
             {
-                return new ParamsCheckResult(false, false, opts);;     // Should always be able to run
-            }
-            else
-            { 
-                if (opts.SourceIds?.Any() is not true)
+                if (!_monDataLayer.SourceIdPresent(sourceId))
                 {
-                    throw new ArgumentException("No source id provided");
+                    throw new ArgumentException("Source argument " + sourceId.ToString() +
+                                                " does not correspond to a known source");
                 }
-
-                foreach (int sourceId in opts.SourceIds)
-                {
-                    if (!_monDataLayer.SourceIdPresent(sourceId))
-                    {
-                        throw new ArgumentException("Source argument " + sourceId.ToString() +
-                                                    " does not correspond to a known source");
-                    }
-                }
-                
-                // parameters valid - return opts.
-
-                return new ParamsCheckResult(false, false, opts);
             }
+            
+            // parameters valid - return opts.
+
+            return new ParamsCheckResult(false, false, opts);
         }
 
         catch (Exception e)
@@ -87,9 +65,8 @@ internal class ParameterChecker
             _loggingHelper.LogCommandLineParameters(opts);
             _loggingHelper.LogCodeError("Importer application aborted", e.Message, e.StackTrace);
             _loggingHelper.CloseLog();
-            return new ParamsCheckResult(false, true, null);;
+            return new ParamsCheckResult(false, true, null);
         }
-
     }
 
 
@@ -131,14 +108,8 @@ public class Options
     [Option('s', "source_ids", Required = false, Separator = ',', HelpText = "Comma separated list of Integer ids of data sources.")]
     public IEnumerable<int>? SourceIds { get; set; }
 
-    [Option('T', "build tables", Required = false, HelpText = "If present, forces the (re)creation of a new set of ad tables")]
-    public bool? RebuildAdTables { get; set; }
-
-    [Option('F', "is a test", Required = false, HelpText = "If present, operates on the sd / ad tables in the test database")]
-    public bool? UsingTestData { get; set; }
-
-    [Option('G', "test report", Required = false, HelpText = "If present, compares and reports on adcomp and expected tables but does not recreate those tables")]
-    public bool? CreateTestReport { get; set; }
+    [Option('A', "code all", Required = false, HelpText = "If present, forces the (re)coding of all of the codable ad data")]
+    public bool RecodeAll { get; set; }
 }
 
 
