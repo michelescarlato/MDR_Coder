@@ -108,8 +108,20 @@ public class Options
     [Option('s', "source_ids", Required = false, Separator = ',', HelpText = "Comma separated list of Integer ids of data sources.")]
     public IEnumerable<int>? SourceIds { get; set; }
 
-    [Option('A', "code all", Required = false, HelpText = "If present, forces the (re)coding of all of the codable ad data")]
-    public bool RecodeAll { get; set; }
+    [Option('G', "code all orgs", Required = false, HelpText = "If present, forces the (re)coding of all of the codable ad organisational data")]
+    public bool RecodeAllOrgs { get; set; }
+    
+    [Option('L', "code all locations", Required = false, HelpText = "If present, forces the (re)coding of all of the codable ad country and location data data")]
+    public bool RecodeAllLocations { get; set; }
+    
+    [Option('T', "code all topics", Required = false, HelpText = "If present, forces the (re)coding of all of the codable ad topic data")]
+    public bool RecodeAllTopics { get; set; }
+    
+    [Option('C', "code all conditions", Required = false, HelpText = "If present, forces the (re)coding of all of the codable ad conditions data")]
+    public bool RecodeAllConditions { get; set; }
+    
+    [Option('P', "code all publishers", Required = false, HelpText = "If present, forces the (re)coding of all of the codable ad publisher data")]
+    public bool RecodeAllPublishers { get; set; }
 }
 
 

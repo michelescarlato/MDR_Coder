@@ -7,13 +7,11 @@ namespace MDR_Coder
     {
         private readonly string _db_conn;
         private readonly string _schema;
-        private readonly bool _nonCodedOnly;
 
-        public OrgHelper(Source source, bool nonCodedOnly)
+        public OrgHelper(Source source)
         {
             _db_conn = source.db_conn ?? "";
-            _schema = source.source_type == "test" ? "expected" : "sd"; 
-            _nonCodedOnly = nonCodedOnly;
+            _schema = source.source_type == "test" ? "expected" : "ad"; 
         }
 
         public void Execute_SQL(string sql_string)
@@ -23,7 +21,7 @@ namespace MDR_Coder
         }
 
         // Set up relevant names for comparison
-        public void establish_temp_names_table()
+        public void establish_temp_tables()
         {
             string sql_string = @"drop table if exists " + _schema + @".temp_org_names;
                  create table " + _schema + @".temp_org_names 
@@ -54,7 +52,7 @@ namespace MDR_Coder
 
         // Study identifier Organisations
 
-        public void update_study_identifiers_using_names()
+        public void update_study_identifiers_using_names(bool code_all)
         {
             string sql_string = @"update " + _schema + @".study_identifiers i
             set identifier_org_id = n.org_id
@@ -66,7 +64,7 @@ namespace MDR_Coder
         }
 
         
-        public void update_study_identifiers_insert_default_names()
+        public void update_study_identifiers_insert_default_names(bool code_all)
         {
             string sql_string = @"update " + _schema + @".study_identifiers i
             set identifier_org = g.default_name,
@@ -80,7 +78,7 @@ namespace MDR_Coder
 
         // Study contributor Organisations
 
-        public void update_study_organisations_using_names()
+        public void update_study_organisations_using_names(bool code_all)
         {
             string sql_string = @"update " + _schema + @".study_organisations c
             set organisation_id = n.org_id
@@ -92,10 +90,10 @@ namespace MDR_Coder
             Execute_SQL(sql_string);
         }
 
-        public void update_study_organisations_insert_default_names()
+        public void update_study_organisations_insert_default_names(bool code_all)
         {
             string sql_string = @"update " + _schema + @".study_organisations c
-            set organisation_name = = g.default_name,
+            set organisation_name = g.default_name,
             organisation_ror_id = g.ror_id
             from context_ctx.organisations g
             where c.organisation_id = g.id;";
@@ -104,7 +102,7 @@ namespace MDR_Coder
         }
 
 
-        public void update_missing_sponsor_ids()
+        public void update_missing_sponsor_ids(bool code_all)
         {
             string sql_string = @"update " + _schema + @".study_identifiers si
                    set identifier_org_id = sc.organisation_id,
@@ -122,7 +120,7 @@ namespace MDR_Coder
 
         // Study contributor people
 
-        public void update_study_people_using_names()
+        public void update_study_people_using_names(bool code_all)
         {
             string sql_string = @"update " + _schema + @".study_people c
             set organisation_id = n.org_id
@@ -134,10 +132,10 @@ namespace MDR_Coder
             Execute_SQL(sql_string);
         }
 
-        public void update_study_people_insert_default_names()
+        public void update_study_people_insert_default_names(bool code_all)
         {
             string sql_string = @"update " + _schema + @".study_people c
-            set organisation_name = = g.default_name,
+            set organisation_name = g.default_name,
             organisation_ror_id = g.ror_id
             from context_ctx.organisations g
             where c.organisation_id = g.id;";
@@ -149,7 +147,7 @@ namespace MDR_Coder
 
         // Object identifier Organisations
 
-        public void update_object_identifiers_using_names()
+        public void update_object_identifiers_using_names(bool code_all)
         {
             string sql_string = @"update " + _schema + @".object_identifiers i
             set identifier_org_id = n.org_id
@@ -161,10 +159,10 @@ namespace MDR_Coder
         }
 
         
-        public void update_object_identifiers_insert_default_names()
+        public void update_object_identifiers_insert_default_names(bool code_all)
         {
             string sql_string = @"update " + _schema + @".object_identifiers i
-            set identifier_org = = g.default_name,
+            set identifier_org = g.default_name,
             identifier_org_ror_id = g.ror_id
             from context_ctx.organisations g
             where i.identifier_org_id = g.id;";
@@ -175,7 +173,7 @@ namespace MDR_Coder
 
         // Object contributor Organisations
 
-        public void update_object_organisations_using_names()
+        public void update_object_organisations_using_names(bool code_all)
         {
             string sql_string = @"update " + _schema + @".object_organisations c
             set organisation_id = n.org_id
@@ -187,10 +185,10 @@ namespace MDR_Coder
             Execute_SQL(sql_string);
         }
 
-        public void update_object_organisations_insert_default_names()
+        public void update_object_organisations_insert_default_names(bool code_all)
         {
             string sql_string = @"update " + _schema + @".object_organisations c
-            set organisation_name = = g.default_name,
+            set organisation_name = g.default_name,
             organisation_ror_id = g.ror_id
             from context_ctx.organisations g
             where c.organisation_id = g.id;";
@@ -201,7 +199,7 @@ namespace MDR_Coder
         
         // Object contributor People
 
-        public void update_object_people_using_names()
+        public void update_object_people_using_names(bool code_all)
         {
             string sql_string = @"update " + _schema + @".object_people c
             set organisation_id = n.org_id
@@ -213,10 +211,10 @@ namespace MDR_Coder
             Execute_SQL(sql_string);
         }
 
-        public void update_object_people_insert_default_names()
+        public void update_object_people_insert_default_names(bool code_all)
         {
             string sql_string = @"update " + _schema + @".object_people c
-            set organisation_name = = g.default_name,
+            set organisation_name = g.default_name,
             organisation_ror_id = g.ror_id
             from context_ctx.organisations g
             where c.organisation_id = g.id;";
@@ -227,7 +225,7 @@ namespace MDR_Coder
 
         // Data Object Organisations
 
-        public void update_data_objects_using_names()
+        public void update_data_objects_using_names(bool code_all)
         {
             string sql_string = @"update " + _schema + @".data_objects d
             set managing_org_id = n.org_id           
@@ -239,10 +237,10 @@ namespace MDR_Coder
         }
 
 
-        public void update_data_objects_insert_default_names()
+        public void update_data_objects_insert_default_names(bool code_all)
         {
             string sql_string = @"update " + _schema + @".data_objects d
-            set managing_org = = g.default_name,
+            set managing_org = g.default_name,
             managing_org_ror_id = g.ror_id
             from context_ctx.organisations g
             where d.managing_org_id = g.id;";
@@ -253,25 +251,25 @@ namespace MDR_Coder
         
         // Object instance organisations
 
-        public void update_object_instances_using_names()
+        public void update_object_instances_using_names(bool code_all)
         {
             string sql_string = @"update " + _schema + @".object_instances c
-            set organisation_id = n.org_id
+            set repository_org_id = n.org_id
             from " + _schema + @".temp_org_names n
-            where c.organisation_id is null
-            and c.organisation_name is not null
-            and lower(c.organisation_name) = n.name;";
+            where c.repository_org_id is null
+            and c.repository_org is not null
+            and lower(c.repository_org) = n.name;";
 
             Execute_SQL(sql_string);
         }
 
-        public void update_object_instances_insert_default_names()
+        public void update_object_instances_insert_default_names(bool code_all)
         {
             string sql_string = @"update " + _schema + @".object_instances c
-            set organisation_name = = g.default_name,
-            organisation_ror_id = g.ror_id
+            set repository_org = g.default_name,
+            repository_org_ror_id = g.ror_id
             from context_ctx.organisations g
-            where c.organisation_id = g.id;";
+            where c.repository_org_id = g.id;";
 
             Execute_SQL(sql_string);
         }
@@ -288,7 +286,7 @@ namespace MDR_Coder
         
         // Code country names
         
-        public void update_study_countries_coding()
+        public void update_study_countries_coding(bool code_all)
         {
             string sql_string = @"update " + _schema + @".study_countries c
             set country_id = n.geoname_id
@@ -300,7 +298,7 @@ namespace MDR_Coder
             Execute_SQL(sql_string);
             
             sql_string = @"update " + _schema + @".study_countries c
-            set country_name = = n.country_name
+            set country_name = n.country_name
             from " + _schema + @".temp_country_names n 
             where c.country_id = n.geoname_id;";
 
@@ -310,7 +308,7 @@ namespace MDR_Coder
         
         // Code location city and country codes
         
-        public void update_studylocation_cities_coding()
+        public void update_studylocation_cities_coding(bool code_all)
         {
             string sql_string = @"update " + _schema + @".study_locations c
             set city_id = n.geoname_id
@@ -322,7 +320,7 @@ namespace MDR_Coder
             Execute_SQL(sql_string);
             
             sql_string = @"update " + _schema + @".study_locations c
-            set city_name = = n.city_name,
+            set city_name = n.city_name,
             country_id = n.country_id,
             country_name = n.country_name
             from " + _schema + @".temp_city_names n 
@@ -331,7 +329,7 @@ namespace MDR_Coder
             Execute_SQL(sql_string);
         }
                 
-        public void update_studylocation_countries_coding()
+        public void update_studylocation_countries_coding(bool code_all)
         {
             string sql_string = @"update " + _schema + @".study_locations c
             set country_id = n.geoname_id
@@ -343,7 +341,7 @@ namespace MDR_Coder
             Execute_SQL(sql_string);
             
             sql_string = @"update " + _schema + @".study_countries c
-            set country_name = = n.country_name
+            set country_name = n.country_name
             from " + _schema + @".temp_country_names n 
             where c.country_id = n.geoname_id;";
 
@@ -357,9 +355,9 @@ namespace MDR_Coder
         public void store_unmatched_study_identifiers_org_names(int source_id)
         {
             string sql_string = @"delete from context_ctx.to_match_orgs where source_id = "
-            + source_id.ToString() + @" and source_table = 'study_identifiers';
+            + source_id + @" and source_table = 'study_identifiers';
             insert into context_ctx.to_match_orgs (source_id, source_table, org_name, number_of) 
-            select " + source_id.ToString() + @", 'study_identifiers', identifier_org, count(identifier_org) 
+            select " + source_id + @", 'study_identifiers', identifier_org, count(identifier_org) 
             from "+ _schema + @".study_identifiers 
             where identifier_org_id is null 
             group by identifier_org; ";
@@ -396,9 +394,9 @@ namespace MDR_Coder
         public void store_unmatched_object_identifiers_org_names(int source_id)
         {
             string sql_string = @"delete from context_ctx.to_match_orgs where source_id = "
-            + source_id.ToString() + @" and source_table = 'object_identifiers';
+            + source_id + @" and source_table = 'object_identifiers';
             insert into context_ctx.to_match_orgs (source_id, source_table, org_name, number_of) 
-            select " + source_id.ToString() + @", 'object_identifiers', identifier_org, count(identifier_org) 
+            select " + source_id + @", 'object_identifiers', identifier_org, count(identifier_org) 
             from " + _schema + @".object_identifiers 
             where identifier_org_id is null 
             group by identifier_org; ";
@@ -454,10 +452,10 @@ namespace MDR_Coder
             string sql_string = @"delete from context_ctx.to_match_orgs where source_id = "
                                 + source_id + @" and source_table = 'object_instances';
             insert into context_ctx.to_match_orgs (source_id, source_table, org_name, number_of) 
-            select " + source_id + @", 'object_instances', managing_org, count(managing_org) 
+            select " + source_id + @", 'object_instances', repository_org, count(repository_org) 
             from " + _schema + @".object_instances 
-            where managing_org_id is null 
-            group by managing_org; ";
+            where repository_org_id is null 
+            group by repository_org; ";
 
             Execute_SQL(sql_string); 
         }

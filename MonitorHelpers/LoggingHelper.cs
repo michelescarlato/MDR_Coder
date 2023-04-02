@@ -132,7 +132,26 @@ public class LoggingHelper : ILoggingHelper
             }
         }
 
-        LogLine("Recoding all data: " + opts.RecodeAll);
+        if (opts.RecodeAllOrgs)
+        {
+            LogLine("Recoding all organisation data, not just recently added");
+        }
+        if (opts.RecodeAllLocations)
+        {
+            LogLine("Recoding all country / location data, not just recently added");
+        }
+        if (opts.RecodeAllTopics)
+        {
+            LogLine("Recoding all topic data, not just recently added");
+        }
+        if (opts.RecodeAllConditions)
+        {
+            LogLine("Recoding all condition data, not just recently added");
+        }
+        if (opts.RecodeAllPublishers)
+        {
+            LogLine("Recoding all publisher data, not just recently added");
+        }
         LogLine("");
     }
 

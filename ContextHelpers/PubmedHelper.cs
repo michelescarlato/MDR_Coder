@@ -7,13 +7,11 @@ namespace MDR_Coder
     {
         private readonly string _db_conn;
         private readonly string _schema;
-        private readonly bool _nonCodedOnly;
 
-        public PubmedHelper(Source source, bool nonCodedOnly)
+        public PubmedHelper(Source source)
         {
             _db_conn = source.db_conn ?? "";
             _schema = source.source_type == "test" ? "expected" : "ad";
-            _nonCodedOnly = nonCodedOnly;
         }
         
         
@@ -23,12 +21,12 @@ namespace MDR_Coder
             conn.Execute(sql_string);
         }
 
-        public void clear_publisher_names()
+        public void clear_publisher_names(bool code_all)
         {
-            // If this is 'recode all', so _nonCodedOnly is false, clear all 
-            // the existing publisher data in the journal_details table.
+            // If this is 'code all' clear all the existing publisher data in the journal_details table.
+            // Otherwise leave the data as is - only newly added data will be coded
             
-            if (!_nonCodedOnly)
+            if (code_all)
             {
                 string sql_string = $@"update {_schema}.journal_details jd
                             set publisher_id = null,
@@ -37,15 +35,14 @@ namespace MDR_Coder
                                coded_on = null";
                 Execute_SQL(sql_string);
             }
-
         }
 
         // Update publisher name in journal details using eissn code.
         
-        public void obtain_publisher_names_using_eissn()
+        public void obtain_publisher_names_using_eissn(bool code_all)
         {
             string sql_string = $@"with t as (select e.eissn, p.publisher, 
-                               p.org_id, g.default_name, g.display_suffix
+                               p.org_id, g.default_name
                                from context_ctx.pub_eissns e
                                inner join context_ctx.publishers p
                                on e.pub_id = p.id
@@ -54,22 +51,21 @@ namespace MDR_Coder
                             update {_schema}.journal_details jd
                             set publisher_id = t.org_id,
                                publisher = t.default_name,
-                               publisher_suffix = t.display_suffix,
                                coded_on = CURRENT_TIMESTAMP(0)
                             from t
                             where jd.eissn = t.eissn ";
 
-            sql_string += _nonCodedOnly ? " and jd.coded_on is null;" : "";
+            sql_string += !code_all ? " and jd.coded_on is null;" : "";
             Execute_SQL(sql_string);
         }
 
 
         // Update publisher name in journal details using pissn code.
         
-        public void obtain_publisher_names_using_pissn()
+        public void obtain_publisher_names_using_pissn(bool code_all)
         {
             string sql_string = $@"with t as (select e.pissn, p.publisher, 
-                               p.org_id, g.default_name, g.display_suffix
+                               p.org_id, g.default_name
                                from context_ctx.pub_pissns e
                                inner join context_ctx.publishers p
                                on e.pub_id = p.id
@@ -78,13 +74,12 @@ namespace MDR_Coder
                             update {_schema}.journal_details jd
                             set publisher_id = t.org_id,
                                publisher = t.default_name,
-                               publisher_suffix = t.display_suffix,
                                coded_on = CURRENT_TIMESTAMP(0)
                             from t
                             where jd.pissn = t.pissn
                             and jd.publisher_id is null ";
             
-            sql_string += _nonCodedOnly ? " and jd.coded_on is null;" : "";
+            sql_string += !code_all ? " and jd.coded_on is null;" : "";
             Execute_SQL(sql_string);
         }
 
@@ -92,10 +87,10 @@ namespace MDR_Coder
         // Update publisher name in journal details using journal title, for remainder 
         // (but slight risk here as journal titles may not be unique).
         
-        public void obtain_publisher_names_using_journal_names()
+        public void obtain_publisher_names_using_journal_names(bool code_all)
         {
             string sql_string = $@"with t as (select e.journal_name, p.publisher, 
-                               p.org_id, g.default_name, g.display_suffix
+                               p.org_id, g.default_name
                                from context_ctx.pub_journals e
                                inner join context_ctx.publishers p
                                on e.pub_id = p.id
@@ -104,41 +99,36 @@ namespace MDR_Coder
                             update {_schema}.journal_details jd
                             set publisher_id = t.org_id,
                                publisher = t.default_name,
-                               publisher_suffix = t.display_suffix,
                                coded_on = CURRENT_TIMESTAMP(0)
                             from t
                             where lower(jd.journal_title) = lower(t.journal_name)
                             and jd.publisher_id is null ";
 
-            sql_string += _nonCodedOnly ? " and jd.coded_on is null;" : "";
+            sql_string += !code_all ? " and jd.coded_on is null;" : "";
             Execute_SQL(sql_string);
         }
 
 
-        // Then need to update 'managing organisation' (= publisher)
-        // using the data in the journal_details table. 
-        // Addition of ROR ids, if possible, will be done later.
+        // Then need to update 'managing organisation' (= publisher) using the data in
+        // the journal_details table. Addition of ROR ids, if possible, will be done later.
 
-        public void update_objects_publisher_data()
+        public void update_objects_publisher_data(bool code_all)
         {
             string sql_string = $@"update {_schema}.data_objects b
                             set managing_org_id = jd.publisher_id,
-                            managing_org = jd.publisher ||
-                            case when jd.publisher_suffix is not null and trim(jd.publisher_suffix) <> '' 
-                            then ' (' || jd.publisher_suffix || ')'
-                            else '' end,
+                            managing_org = jd.publisher,
                             coded_on = CURRENT_TIMESTAMP(0)
                             from {_schema}.journal_details jd
                             where b.sd_oid = jd.sd_oid ";
             
-            sql_string += _nonCodedOnly ? " and b.coded_on is null;" : "";
+            sql_string += !code_all ? " and b.coded_on is null;" : "";
             Execute_SQL(sql_string);
         }
 
 
         // Also update the publishers' identifiers in the object identifiers' table.
 
-        public void update_identifiers_publisher_data()
+        public void update_identifiers_publisher_data(bool code_all)
         {
             string sql_string = $@"update {_schema}.object_identifiers i
                             set identifier_org_id = jd.publisher_id,
@@ -151,7 +141,7 @@ namespace MDR_Coder
                             where i.sd_oid = jd.sd_oid
                             and i.identifier_type_id = 34 ";
             
-            sql_string += _nonCodedOnly ? " and i.coded_on is null;" : "";
+            sql_string += !code_all ? " and i.coded_on is null;" : "";
             Execute_SQL(sql_string);
         }
 

@@ -45,7 +45,7 @@ public class Coder
     {
         // Obtain source details, augment with connection string for this database.
         // Set up sf monitor tables as foreign tables, temporarily.
-        
+
         Credentials creds = _monDataLayer.Credentials;
         source.db_conn = creds.GetConnectionString(source.database_name!);
         _loggingHelper.LogStudyHeader(opts, "For source: " + source.id + ": " + source.database_name!);
@@ -54,11 +54,11 @@ public class Coder
         CodingBuilder cb = new(source, opts, _loggingHelper);
         cb.EstablishContextForeignTables(creds);
         _loggingHelper.LogLine("Foreign (mon) tables established in database");
-        cb.EstablishTempNamesTable();
+        cb.EstablishTempTables();
         
         // If pubmed (or includes pubmed, as with expected test data), do these updates first.
         
-        if (source.id == 100135 || source.id == 999999)
+        if (source.id is 100135 or 999999)
         {
             cb.ObtainPublisherInformation();
             cb.ApplyPublisherData();
@@ -90,15 +90,17 @@ public class Coder
             {
                 cb.UpdateStudyCountries();
                 _loggingHelper.LogLine("Study country names and codes updated");
+                cb.StoreUnMatchedCountriesForStudies();
+                _loggingHelper.LogLine("Unmatched country names for studies stored");
             }
+            
             if (source.has_study_locations is true)
             {
                 cb.UpdateStudyLocations();
                 _loggingHelper.LogLine("Study location names and codes updated");
+                cb.StoreUnMatchedLocationDataForStudies();
+                _loggingHelper.LogLine("Unmatched location data for studies stored");
             }
-            
-            cb.StoreUnMatchedCountriesForStudies();
-            _loggingHelper.LogLine("Unmatched country names for studies stored");
             
             if (source.has_study_iec is true)
             {
@@ -107,7 +109,7 @@ public class Coder
             }
         }
 
-        if (source.source_type == "object" || source.source_type == "test")
+        if (source.source_type is "object" or "test")
         {
             // works at present in the context of PubMed - may need changing 
 
@@ -135,7 +137,7 @@ public class Coder
 
         // Update and standardise topic ids and names
         
-        cb.UpdateConditions(source.source_type!);
+        cb.UpdateConditions();
         _loggingHelper.LogLine("Conditions data updated");
         
         cb.UpdateTopics(source.source_type!);
