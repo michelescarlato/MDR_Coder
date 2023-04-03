@@ -172,65 +172,25 @@ public class LoggingHelper : ILoggingHelper
         swSummary.Flush();
         swSummary.Close();
     }
-
-    /*
-    public void LogTableStatistics(Source s, string schema)
+    
+    
+    private void Transmit(string message)
     {
-        // Gets and logs record count for each table in the ad schema of the database
-        // Start by obtaining connection string, then construct log line for each by 
-        // calling db interrogation for each applicable table.
-        
-        string dbConn = s.db_conn ?? "";
-
-        LogLine("");
-        LogLine("TABLE RECORD NUMBERS");
-
-        if (s.has_study_tables is true)
-        {
-            LogLine("");
-            LogLine("study tables...\n");
-            LogLine(GetTableRecordCount(dbConn, schema, "studies"));
-            LogLine(GetTableRecordCount(dbConn, schema, "study_identifiers"));
-            LogLine(GetTableRecordCount(dbConn, schema, "study_titles"));
-
-            // these are database dependent
-            if (s.has_study_topics is true) LogLine(GetTableRecordCount(dbConn, schema, "study_topics"));
-            if (s.has_study_features is true) LogLine(GetTableRecordCount(dbConn, schema, "study_features"));
-            if (s.has_study_contributors is true) LogLine(GetTableRecordCount(dbConn, schema, "study_contributors"));
-            if (s.has_study_references is true) LogLine(GetTableRecordCount(dbConn, schema, "study_references"));
-            if (s.has_study_relationships is true) LogLine(GetTableRecordCount(dbConn, schema, "study_relationships"));
-            if (s.has_study_links is true) LogLine(GetTableRecordCount(dbConn, schema, "study_links"));
-            if (s.has_study_ipd_available is true) LogLine(GetTableRecordCount(dbConn, schema, "study_ipd_available"));
-            if (s.has_study_countries is true) LogLine(GetTableRecordCount(dbConn, schema, "study_countries"));
-            if (s.has_study_locations is true) LogLine(GetTableRecordCount(dbConn, schema, "study_locations"));
-        }
-        LogLine("");
-        LogLine("object tables...\n");
-        // these common to all databases
-        LogLine(GetTableRecordCount(dbConn, schema, "data_objects"));
-        LogLine(GetTableRecordCount(dbConn, schema, "object_instances"));
-        LogLine(GetTableRecordCount(dbConn, schema, "object_titles"));
-
-        // these are database dependent		
-
-        if (s.has_object_datasets is true) LogLine(GetTableRecordCount(dbConn, schema, "object_datasets"));
-        if (s.has_object_dates is true) LogLine(GetTableRecordCount(dbConn, schema, "object_dates"));
-        if (s.has_object_relationships is true) LogLine(GetTableRecordCount(dbConn, schema, "object_relationships"));
-        if (s.has_object_rights is true) LogLine(GetTableRecordCount(dbConn, schema, "object_rights"));
-        if (s.has_object_pubmed_set is true)
-        {
-            LogLine(GetTableRecordCount(dbConn, schema, "citation_objects"));
-            LogLine(GetTableRecordCount(dbConn, schema, "object_contributors"));
-            LogLine(GetTableRecordCount(dbConn, schema, "object_topics"));
-            LogLine(GetTableRecordCount(dbConn, schema, "object_comments"));
-            LogLine(GetTableRecordCount(dbConn, schema, "object_descriptions"));
-            LogLine(GetTableRecordCount(dbConn, schema, "object_identifiers"));
-            LogLine(GetTableRecordCount(dbConn, schema, "object_db_links"));
-            LogLine(GetTableRecordCount(dbConn, schema, "object_publication_types"));
-        }
+        _sw!.WriteLine(message);
+        Console.WriteLine(message);
     }
 
-    
+
+    public string GetTableRecordCount(string dbConn, string schema, string tableName)
+    {
+        string sqlString = "select count(*) from " + schema + "." + tableName;
+
+        using NpgsqlConnection conn = new NpgsqlConnection(dbConn);
+        int res = conn.ExecuteScalar<int>(sqlString);
+        return res.ToString() + " records found in " + schema + "." + tableName;
+    }
+
+   /*
     public void LogDiffs(Source s)
     {
         string dbConn = s.db_conn!;
@@ -256,33 +216,7 @@ public class LoggingHelper : ILoggingHelper
         GetObjectStats(dbConn, "atts");
     }
 
-    */
     
-    private string GetTableRecordCount(string dbConn, string tableName)
-    {
-        string tName = "sd." + tableName;
-        string sqlString = $"select count(*) from {tName}";
-
-        using NpgsqlConnection conn = new NpgsqlConnection(dbConn);
-        int res = conn.ExecuteScalar<int>(sqlString);
-        return res + " records found in sd." + tableName;
-    }
-
-    private void GetStudyStats(string dbConn, string tableType)
-    {
-        string tableName = "sd.to_ad_study_" + tableType;
-        string sqlString = $@"select status, count(sd_sid) as num from {tableName}
-                           group by status order by status;";
-        GetAndWriteStats(dbConn, sqlString);
-    }
-
-    private void GetObjectStats(string dbConn, string tableType)
-    {
-        string tableName = "sd.to_ad_object_" + tableType;
-        string sqlString = $@"select status, count(sd_oid) as num from {tableName}
-                              group by status order by status;";
-        GetAndWriteStats(dbConn, sqlString);
-    }
 
     private void GetAndWriteStats(string dbConn, string sqlString)
     {
@@ -297,6 +231,7 @@ public class LoggingHelper : ILoggingHelper
         }
         LogLine("");
     }
+
 
     private string GetEntityRecDiffs(string dbConn, string entityType)
     {
@@ -317,20 +252,5 @@ public class LoggingHelper : ILoggingHelper
         return $"{res} records found with edits to the dataset data;";
     }
 
-    private void Transmit(string message)
-    {
-        _sw!.WriteLine(message);
-        Console.WriteLine(message);
-    }
-
-
-
-    public string GetTableRecordCount(string dbConn, string schema, string tableName)
-    {
-        string sqlString = "select count(*) from " + schema + "." + tableName;
-
-        using NpgsqlConnection conn = new NpgsqlConnection(dbConn);
-        int res = conn.ExecuteScalar<int>(sqlString);
-        return res.ToString() + " records found in " + schema + "." + tableName;
-    }
+   */
 }

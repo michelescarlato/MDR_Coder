@@ -7,18 +7,20 @@ namespace MDR_Coder
     {
         private readonly string _db_conn;
         private readonly string _schema;
+        private readonly ILoggingHelper _loggingHelper;     
 
-        public PubmedHelper(Source source)
+        public PubmedHelper(Source source, ILoggingHelper logger)
         {
             _db_conn = source.db_conn ?? "";
             _schema = source.source_type == "test" ? "expected" : "ad";
+            _loggingHelper = logger;
         }
         
         
-        private void Execute_SQL(string sql_string)
+        private int ExecuteSQL(string sql_string)
         {
             using var conn = new NpgsqlConnection(_db_conn);
-            conn.Execute(sql_string);
+            return conn.Execute(sql_string);
         }
 
         public void clear_publisher_names(bool code_all)
@@ -31,9 +33,9 @@ namespace MDR_Coder
                 string sql_string = $@"update {_schema}.journal_details jd
                             set publisher_id = null,
                                publisher = null,
-                               publisher_suffix = null,
                                coded_on = null";
-                Execute_SQL(sql_string);
+                int res = ExecuteSQL(sql_string);
+                _loggingHelper.LogLine($"Cleared {res} journal details records of publisher information");
             }
         }
 
@@ -56,7 +58,8 @@ namespace MDR_Coder
                             where jd.eissn = t.eissn ";
 
             sql_string += !code_all ? " and jd.coded_on is null;" : "";
-            Execute_SQL(sql_string);
+            int res = ExecuteSQL(sql_string);
+            _loggingHelper.LogLine($"Updated {res} journal details records with publisher, from eissn");
         }
 
 
@@ -80,7 +83,8 @@ namespace MDR_Coder
                             and jd.publisher_id is null ";
             
             sql_string += !code_all ? " and jd.coded_on is null;" : "";
-            Execute_SQL(sql_string);
+            int res = ExecuteSQL(sql_string);
+            _loggingHelper.LogLine($"Updated {res} journal details records with publisher, from pissn");
         }
 
 
@@ -105,7 +109,8 @@ namespace MDR_Coder
                             and jd.publisher_id is null ";
 
             sql_string += !code_all ? " and jd.coded_on is null;" : "";
-            Execute_SQL(sql_string);
+            int res = ExecuteSQL(sql_string);
+            _loggingHelper.LogLine($"Updated {res} journal details records with publisher, from journal title");
         }
 
 
@@ -122,7 +127,8 @@ namespace MDR_Coder
                             where b.sd_oid = jd.sd_oid ";
             
             sql_string += !code_all ? " and b.coded_on is null;" : "";
-            Execute_SQL(sql_string);
+            int res = ExecuteSQL(sql_string);
+            _loggingHelper.LogLine($"Updated {res} data object records with publisher information");
         }
 
 
@@ -132,21 +138,19 @@ namespace MDR_Coder
         {
             string sql_string = $@"update {_schema}.object_identifiers i
                             set identifier_org_id = jd.publisher_id,
-                            identifier_org = jd.publisher ||
-                            case when jd.publisher_suffix is not null and trim(jd.publisher_suffix) <> '' 
-                            then ' (' || jd.publisher_suffix || ')'
-                            else '' end,
+                            identifier_org = jd.publisher,
                             coded_on = CURRENT_TIMESTAMP(0)
                             from {_schema}.journal_details jd
                             where i.sd_oid = jd.sd_oid
                             and i.identifier_type_id = 34 ";
             
             sql_string += !code_all ? " and i.coded_on is null;" : "";
-            Execute_SQL(sql_string);
+            int res = ExecuteSQL(sql_string);
+            _loggingHelper.LogLine($"Updated {res} object identifier records with publisher information");
         }
 
 
-        public void store_unmatched_publisher_org_names(int source_id)
+        public int store_unmatched_publisher_org_names(int source_id)
         {
             string sql_string = $@"delete from context_ctx.to_match_orgs where source_id = {source_id} 
                                    and source_table = 'journal_details';
@@ -156,42 +160,9 @@ namespace MDR_Coder
             where publisher_id is null 
             group by publisher;";
             
-            Execute_SQL(sql_string);
+            return ExecuteSQL(sql_string);
         }
-
-
-        /*
-         
-        public void store_bank_links_in_pp_schema()
-        {
-            string sql_string = @"DROP TABLE IF EXISTS pp.bank_links;
-                         CREATE TABLE pp.bank_links as
-                         SELECT 
-                         nlm.id as source_id, db.id_in_db as sd_sid, db.sd_oid as pmid
-                         from sd.object_db_links db
-                         inner join context_ctx.nlm_databanks nlm
-                         on db.db_name = nlm.nlm_abbrev
-                         where bank_type = 'Trial registry';";
-
-                        Execute_SQL(sql_string);
-        }
-
-
-        public void combine_distinct_study_pubmed_links()
-        {
-            string sql_string = @"DROP TABLE IF EXISTS pp.total_pubmed_links;
-                        CREATE TABLE pp.total_pubmed_links as
-                        SELECT source_id, sd_sid, pmid
-                        FROM pp.bank_links
-                        UNION
-                        SELECT source_id, sd_sid, pmid
-                        FROM pp.pmids_by_source_total;";
-
-                       Execute_SQL(sql_string);
-        }
-
-        */
-
+        
     }
 
 }

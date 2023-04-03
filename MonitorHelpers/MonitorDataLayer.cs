@@ -45,10 +45,10 @@ public class MonDataLayer : IMonDataLayer
         return conn.Get<Source>(sourceId);
     }
 
-    public int GetNextImportEventId()
+    public int GetNextCodingEventId()
     {
         using NpgsqlConnection conn = new(_connString);
-        string sqlString = "select max(id) from sf.import_events ";
+        string sqlString = "select max(id) from sf.coding_events ";
         int lastId = conn.ExecuteScalar<int>(sqlString);
         return (lastId == 0) ? 10001 : lastId + 1;
     }
@@ -157,46 +157,18 @@ public class MonDataLayer : IMonDataLayer
         return conn.Query<ObjectFileRecord>(sqlString).FirstOrDefault();
     }
 
-
-    public void UpdateFileRecLastImported(int id, string sourceType)
+    public int StoreCodingEvent(CodeEvent coding)
     {
+        coding.time_ended = DateTime.Now;
         using NpgsqlConnection conn = new(_connString);
-        string sqlString = sourceType.ToLower() == "study" ? "update sf.source_data_studies"
-            : "update sf.source_data_objects";
-        sqlString += " set last_imported = current_timestamp";
-        sqlString += " where id = " + id.ToString();
-        conn.Execute(sqlString);
-    }
-
-
-    public int StoreImportEvent(ImportEvent import)
-    {
-        import.time_ended = DateTime.Now;
-        using NpgsqlConnection conn = new(_connString);
-        return (int)conn.Insert<ImportEvent>(import);
-    }
-
-
-    public bool CheckIfFullHarvest(int? sourceId)
-    {
-        string sqlString = @"select type_id from sf.harvest_events
-                     where source_id = " + sourceId.ToString() + @"
-                     and time_ended = (
-                           select max(time_ended) from sf.harvest_events 
-                           where source_id = " + sourceId.ToString() + @"
-                     )";
-
-        using NpgsqlConnection conn = new(_connString);
-        int res = conn.ExecuteScalar<int>(sqlString);
-        return (res == 1);
+        return (int)conn.Insert(coding);
     }
     
-    
-    public void UpdateStudiesLastImportedDate(int importId, int? sourceId)
+    public void UpdateStudiesLastCodedDate(int codingId, int? sourceId)
     {
-        string top_string = @"Update mon_sf.source_data_studies src
-                      set last_import_id = " + importId.ToString() + @", 
-                      last_imported = current_timestamp
+        string top_string = @"Update mn.source_data src
+                      set last_coding_id = " + codingId.ToString() + @", 
+                      last_coded = current_timestamp
                       from 
                          (select so.id, so.sd_sid 
                          FROM sd.studies so
@@ -212,9 +184,9 @@ public class MonDataLayer : IMonDataLayer
     }
 
     
-    public void UpdateObjectsLastImportedDate(int importId, int? sourceId)
+    public void UpdateObjectsLastCodedDate(int importId, int? sourceId)
     {
-        string top_string = @"UPDATE mon_sf.source_data_objects src
+        string top_string = @"UPDATE mon.source_data src
                       set last_import_id = " + importId.ToString() + @", 
                       last_imported = current_timestamp
                       from 

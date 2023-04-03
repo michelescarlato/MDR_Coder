@@ -50,10 +50,12 @@ public class Coder
         source.db_conn = creds.GetConnectionString(source.database_name!);
         _loggingHelper.LogStudyHeader(opts, "For source: " + source.id + ": " + source.database_name!);
         _loggingHelper.LogHeader("Setup");
-       
+
         CodingBuilder cb = new(source, opts, _loggingHelper);
         cb.EstablishContextForeignTables(creds);
         _loggingHelper.LogLine("Foreign (mon) tables established in database");
+        int codingId = _monDataLayer.GetNextCodingEventId();
+        CodeEvent coding = cb.CreateCodingEvent(codingId);  
         cb.EstablishTempTables();
         
         // If pubmed (or includes pubmed, as with expected test data), do these updates first.
@@ -62,7 +64,6 @@ public class Coder
         {
             cb.ObtainPublisherInformation();
             cb.ApplyPublisherData();
-            _loggingHelper.LogLine("Updating Publisher Info\n");
         }
 
         // Update and standardise organisation ids and names
@@ -70,80 +71,61 @@ public class Coder
         if (source.has_study_tables is true || source.source_type == "test")
         {
             cb.UpdateStudyIdentifiers();
-            _loggingHelper.LogLine("Study identifier orgs updated");
 
             if (source.has_study_organisations is true)
             {
                 cb.UpdateStudyOrgs();
-                _loggingHelper.LogLine("Study contributor orgs updated");
             }
             if (source.has_study_people is true)
             {
                 cb.UpdateStudyPeople();
-                _loggingHelper.LogLine("Study contributor orgs updated");
             }
-            
-            cb.StoreUnMatchedOrgNamesForStudies();
-            _loggingHelper.LogLine("Unmatched org names for studies stored");
             
             if (source.has_study_countries is true)
             {
                 cb.UpdateStudyCountries();
-                _loggingHelper.LogLine("Study country names and codes updated");
-                cb.StoreUnMatchedCountriesForStudies();
-                _loggingHelper.LogLine("Unmatched country names for studies stored");
             }
             
             if (source.has_study_locations is true)
             {
                 cb.UpdateStudyLocations();
-                _loggingHelper.LogLine("Study location names and codes updated");
-                cb.StoreUnMatchedLocationDataForStudies();
-                _loggingHelper.LogLine("Unmatched location data for studies stored");
             }
             
             if (source.has_study_iec is true)
             {
                 cb.UpdateStudyIEC();
-                _loggingHelper.LogLine("Study inclusion and exclusion criteria updated");
             }
         }
 
-        if (source.source_type is "object" or "test")
+        cb.UpdateDataObjectOrgs();
+        cb.UpdateObjectInstanceOrgs();        
+        
+        if (source.source_type is "test" || source.has_object_pubmed_set is true)
         {
-            // works at present in the context of PubMed - may need changing 
-
             cb.UpdateObjectIdentifiers();
-            _loggingHelper.LogLine("Object identifier orgs updated");
-
             cb.UpdateObjectPeople();
-            _loggingHelper.LogLine("Object contributor orgs updated");
-            
             cb.UpdateObjectOrganisations();
-            _loggingHelper.LogLine("Object contributor orgs updated");
-
-            cb.StoreUnMatchedNamesForObjects();
-            _loggingHelper.LogLine("Unmatched org names for objects stored");
         }
 
-        cb.UpdateDataObjectOrgs();
-        _loggingHelper.LogLine("Data object managing orgs updated");
-        
-        cb.UpdateObjectInstanceOrgs();
-        _loggingHelper.LogLine("Data object instance managing orgs updated");
 
-        cb.StoreUnMatchedNamesForDataObjects();
-        _loggingHelper.LogLine("Unmatched org names in data objects stored");
-
-        // Update and standardise topic ids and names
+        // Update and standardise topic ids and names. and condition ids and names
         
+        cb.UpdateTopics(source.source_type!);       
         cb.UpdateConditions();
-        _loggingHelper.LogLine("Conditions data updated");
         
-        cb.UpdateTopics(source.source_type!);
-        _loggingHelper.LogLine("Topic data updated");
+        // Tidy up 
         
-        // Tidy up - 
+        if (source.has_study_tables is true)
+        {
+            cb.UpdateStudiesImportedDateInMon(codingId);
+        }
+        else
+        {
+            // only do the objects table if there are no studies (e.g. PubMed)
+            cb.UpdateObjectsImportedDateInMon(codingId);
+        }
+        _monDataLayer.StoreCodingEvent(coding);
+        
         cb.DropTempTables();
         cb.DropContextForeignTables();
         _loggingHelper.LogLine("Foreign (mon) tables removed from database");    
