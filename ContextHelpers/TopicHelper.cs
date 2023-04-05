@@ -56,14 +56,6 @@ namespace MDR_Coder
             int org_id_count = GetFieldCount(schema, table_name, id_field);
             _loggingHelper.LogLine($"{org_id_count} records, from {table_count}, have MESH coded topics in {schema}.{table_name}");
         }
-        
-        private void FeedbackConditionResults(string schema, string table_name, string id_field)
-                   
-        {
-            int table_count = GetTableCount(schema, table_name);
-            int org_id_count = GetFieldCount(schema, table_name, id_field);
-            _loggingHelper.LogLine($"{org_id_count} records, from {table_count}, have ICD coded conditions in {schema}.{table_name}");
-        }
 
         public void process_topics(bool code_all)
         {
@@ -446,183 +438,13 @@ namespace MDR_Coder
             _loggingHelper.LogLine("Deleting " + res + fback);
 
         }
-
-        public void process_conditions(bool code_all)
-        {
-            string schema = _source_type == "test" ? "expected" : "ad";
        
-            study_rec_count = GetTableCount(schema, "study_conditions");
-            icd_remove_no_info_conditions(schema, study_rec_count);       
-            icd_match_conditions_using_code(schema, study_rec_count, code_all);           
-            icd_match_conditions_using_term(schema, study_rec_count, code_all);
-           
-            // icd_remove_duplicates("study", "ad", study_rec_count);  // not sure if required
-        }
-        
-        public void icd_remove_no_info_conditions(string schema, int rec_count)
-        {
-            // Only applies to newly added condition records (coded_on = null). 
-            // Previous condition records will already have been filtered by this process
-            
-            string top_string = $@"delete from {schema}.study_conditions "  ;
-
-            string sql_string = top_string + @" where (lower(original_value) = '' 
-                            or lower(original_value) = 'human'
-                            or lower(original_value) = 'humans'
-                            or lower(original_value) = 'other') ";
-            delete_conditions(sql_string, rec_count, "A");
-
-            sql_string = top_string + @" where (lower(original_value) = 'healthy adults' 
-                            or lower(original_value) = 'healthy adult'
-                            or lower(original_value) = 'healthy person'
-                            or lower(original_value) = 'healthy people'
-                            or lower(original_value) = 'female'
-                            or lower(original_value) = 'male'
-                            or lower(original_value) = 'healthy adult female'
-                            or lower(original_value) = 'healthy adult male') ";
-            delete_conditions(sql_string, rec_count, "B");
-
-            sql_string = top_string + @" where (lower(original_value) = 'hv' 
-                            or lower(original_value) = 'healthy volunteer'
-                            or lower(original_value) = 'healthy volunteers'
-                            or lower(original_value) = 'volunteer'
-                            or lower(original_value) = 'healthy control'
-                            or lower(original_value) = 'normal control') ";
-            delete_conditions(sql_string, rec_count, "C");
-
-            sql_string = top_string + @" where (lower(original_value) = 'healthy individual' 
-                            or lower(original_value) = 'healthy individuals'
-                            or lower(original_value) = 'n/a(healthy adults)'
-                            or lower(original_value) = 'n/a (healthy adults)'
-                            or lower(original_value) = 'none (healthy adults)'
-                            or lower(original_value) = 'healthy older adults'
-                            or lower(original_value) = 'healthy japanese subjects'
-                            or lower(original_value) = 'toxicity' 
-                            or lower(original_value) = 'health condition 1: o- medical and surgical') ";
-            delete_conditions(sql_string, rec_count, "D");
-
-        }
-
-
-        public void delete_conditions(string sql_string, int rec_count, string delete_set)
-        {
-            // Can be difficult to do this with large datasets of conditions.
-            
-            sql_string += " and coded_on is null ";
-            int rec_batch = 200000;                                                      
-
-            try
-            {
-                if (rec_count > rec_batch)
-                {
-                    for (int r = 1; r <= rec_count; r += rec_batch)
-                    {
-                        string batch_sql_string = sql_string + " and id >= " + r + " and id < " + (r + rec_batch);
-                        int res_r = ExecuteSQL(batch_sql_string);
-                        string feedback = $"Deleting {res_r} 'no information' conditions (group {delete_set}) - {r} to ";
-                        feedback += (r + rec_batch < rec_count) ? (r + rec_batch).ToString() : rec_count.ToString();
-                        _loggingHelper.LogLine(feedback);
-                    }
-                }
-                else
-                {
-                    int res = ExecuteSQL(sql_string);
-                    _loggingHelper.LogLine($"Deleting {res} 'no information' conditions (group {delete_set}) - as a single query");
-                }
-                
-            }
-            catch (Exception e)
-            {
-                string eres = e.Message;
-                _loggingHelper.LogError("In deleting 'no information' conditions: " + eres);
-            }
-        }
-        
-        public void icd_match_conditions_using_code(string schema, int rec_count, bool code_all)
-        {
-            int rec_batch = 200000;
-            string sql_string = @"Update " + schema + @".study_conditions t
-                             set icd_code = m.code,
-                             icd_name = m.term,
-                             coded_on = CURRENT_TIMESTAMP
-                             from context_ctx.icd_lookup m
-                             where t.original_ct_code  = m.entry_code 
-                             and t.original_ct_type_id = m.entry_type_id ";
-            sql_string += code_all ? "" : " and coded_on is null ";
-            try
-            {
-                if (rec_count > rec_batch)      // Can be difficult to do ths with large datasets.
-                {
-                    for (int r = 1; r <= rec_count; r += rec_batch)
-                    {
-                        string batch_sql_string = sql_string + " and id >= " + r + " and id < " + (r + rec_batch);
-                        int res_r = ExecuteSQL(batch_sql_string);
-                        string feedback = $"Updating {res_r} study condition codes, using codes - {r} to ";
-                        feedback += (r + rec_batch < rec_count) ? (r + rec_batch).ToString() : rec_count.ToString();
-                        _loggingHelper.LogLine(feedback);
-                    }
-                }
-                else
-                {
-                    int res = ExecuteSQL(sql_string);
-                    _loggingHelper.LogLine($"Updating {res} study condition codes, using codes -  as a single query");
-                }
-            }
-            catch (Exception e)
-            {
-                string eres = e.Message;
-                _loggingHelper.LogError("In updating conditions using codes: " + eres);
-            }
-        }
-
-        
-        public void icd_match_conditions_using_term(string schema, int rec_count, bool code_all)
-        {
-            int rec_batch = 200000;
-            string sql_string = @"Update " + schema + @".study_conditions t
-                             set icd_code = m.code,
-                             icd_name = m.term,
-                             coded_on = CURRENT_TIMESTAMP
-                             from context_ctx.icd_lookup m
-                             where lower(t.original_value) = m.entry_term ";
-            sql_string += code_all ? "" : " and coded_on is null ";
-            try
-            {
-                if (rec_count > rec_batch)   // Can be difficult to do ths with large datasets.
-                {
-                    for (int r = 1; r <= rec_count; r += rec_batch)
-                    {
-                        string batch_sql_string = sql_string + " and id >= " + r + " and id < " + (r + rec_batch);
-                        int res_r = ExecuteSQL(batch_sql_string);
-                        string feedback = $"Updating {res_r} study condition codes, using terms - {r} to ";
-                        feedback += (r + rec_batch < rec_count) ? (r + rec_batch).ToString() : rec_count.ToString();
-                        _loggingHelper.LogLine(feedback);
-                    }
-                }
-                else
-                {
-                    int res = ExecuteSQL(sql_string);
-                    _loggingHelper.LogLine($"Updating {res} study condition codes, using terms - as a single query");
-                }
-
-                FeedbackConditionResults(schema, "study_conditions", "icd_code");
-            }
-            catch (Exception e)
-            {
-                string eres = e.Message;
-                _loggingHelper.LogError("In updating conditions using terms: " + eres);
-            }
-            
-            
-        }
-        
         public int store_unmatched_topic_values(string source_type, int source_id)
         {
-            string sql_string = @"delete from context_ctx.to_match_topics where source_id = "
-            + source_id + @";
-            insert into context_ctx.to_match_topics (source_id, topic_value, number_of) 
-            select " + source_id + @", original_value, count(original_value)";
-
+            string sql_string = @"delete from context_ctx.to_match_topics where source_id = " + source_id ;
+            ExecuteSQL(sql_string);
+            sql_string = @"insert into context_ctx.to_match_topics (source_id, topic_value, number_of) 
+                       select " + source_id + @", original_value, count(original_value)";
             sql_string += source_type.ToLower() == "study"
                                 ? " from ad.study_topics t"
                                 : " from ad.object_topics t";
@@ -632,22 +454,6 @@ namespace MDR_Coder
             _loggingHelper.LogLine($"Storing {res} topic codes not matched to MESH codes for review");
             return res;
         }
-        
-        
-        public int store_unmatched_condition_values(int source_id)
-        {
-            string sql_string = @"delete from context_ctx.to_match_conditions where source_id = "
-                                + source_id + @";
-            insert into context_ctx.to_match_conditions (source_id, condition_value, number_of) 
-            select " + source_id + @", original_value, count(original_value) ";
-            sql_string += @" from ad.study_conditions t 
-                             where t.icd_code is null 
-                             group by t.original_value;";
-            int res = ExecuteSQL(sql_string);
-            _loggingHelper.LogLine($"Storing {res} condition codes not matched to ICD codes for review");
-            return res;
-        }
-        
         
         public void delete_temp_tables()
         {

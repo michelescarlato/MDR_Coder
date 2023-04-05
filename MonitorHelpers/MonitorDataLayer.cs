@@ -180,7 +180,7 @@ public class MonDataLayer : IMonDataLayer
                           where s.sd_sid = src.sd_id and
                           src.source_id = " + sourceId.ToString();
 
-        UpdateLastImportedDate("studies", top_string, base_string);
+        UpdateLastCodedDate("studies", top_string, base_string);
     }
 
     
@@ -200,11 +200,11 @@ public class MonDataLayer : IMonDataLayer
                           where s.sd_oid = src.sd_id and
                           src.source_id = " + sourceId.ToString();
 
-        UpdateLastImportedDate("data_objects", top_string, base_string);
+        UpdateLastCodedDate("data_objects", top_string, base_string);
     }
 
 
-    private void UpdateLastImportedDate(string tableName, string topSql, string baseSql)
+    private void UpdateLastCodedDate(string tableName, string topSql, string baseSql)
     {
         try
         {   

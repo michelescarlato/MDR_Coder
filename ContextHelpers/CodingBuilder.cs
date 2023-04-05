@@ -14,6 +14,7 @@ namespace MDR_Coder
         private readonly OrgHelper org_helper;
         private readonly PubmedHelper pubmed_helper;
         private readonly TopicHelper topic_helper;
+        private readonly ConditionHelper condition_helper;
         private CodeEvent? codeEvent = null;
 
         public CodingBuilder(Source source, Options opts, ILoggingHelper logging_helper)
@@ -27,6 +28,7 @@ namespace MDR_Coder
             pubmed_helper = new PubmedHelper(source, logging_helper);
             org_helper = new OrgHelper(source, logging_helper);
             topic_helper = new TopicHelper(source, logging_helper);
+            condition_helper = new ConditionHelper(source, logging_helper);
         }
 
 
@@ -216,11 +218,11 @@ namespace MDR_Coder
         {
             if (_source.has_study_conditions is true)
             {
-                topic_helper.process_conditions(_opts.RecodeAllPublishers);
+                condition_helper.process_conditions(_opts.RecodeAllConditions);
 
                 if (_source.source_type != "test")
                 {
-                    codeEvent!.num_conditions_to_match += topic_helper.store_unmatched_condition_values(source_id);
+                    codeEvent!.num_conditions_to_match += condition_helper.store_unmatched_condition_values(source_id);
                 }
             }
         }
@@ -229,6 +231,7 @@ namespace MDR_Coder
         {
             org_helper.delete_temp_tables();
             topic_helper.delete_temp_tables();
+            condition_helper.delete_temp_tables();
         }
         
         

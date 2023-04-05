@@ -7,7 +7,6 @@ public interface IMonDataLayer
     bool SourceIdPresent(int? source_id);
     Source? FetchSourceParameters(int? source_id);
     int GetNextCodingEventId();
-
     int StoreCodingEvent(CodeEvent coding);
     
     // void LogDiffs(ISource s);
