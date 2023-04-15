@@ -52,6 +52,15 @@ internal class ParameterChecker
                                                 " does not correspond to a known source");
                 }
             }
+
+            if (opts.RecodeAll)    // recode ALL options force the recoding of all data, even if already coded
+            {
+                opts.RecodeAllOrgs = true;
+                opts.RecodeAllConditions = true;
+                opts.RecodeAllTopics = true;
+                opts.RecodeAllLocations = true;
+                opts.RecodeAllPublishers = true;
+            }
             
             // parameters valid - return opts.
 
@@ -107,20 +116,23 @@ public class Options
 
     [Option('s', "source_ids", Required = false, Separator = ',', HelpText = "Comma separated list of Integer ids of data sources.")]
     public IEnumerable<int>? SourceIds { get; set; }
-
-    [Option('G', "code all orgs", Required = false, HelpText = "If present, forces the (re)coding of all of the codable ad organisational data")]
+    
+    [Option('A', "code ALL", Required = false, HelpText = "If present, forces the (re)coding of all of the codable data")]
+    public bool RecodeAll { get; set; }
+    
+    [Option('G', "code ALL orgs", Required = false, HelpText = "If present, forces the (re)coding of all of the codable ad organisational data")]
     public bool RecodeAllOrgs { get; set; }
     
-    [Option('L', "code all locations", Required = false, HelpText = "If present, forces the (re)coding of all of the codable ad country and location data data")]
+    [Option('L', "code ALL locations", Required = false, HelpText = "If present, forces the (re)coding of all of the codable ad country and location data data")]
     public bool RecodeAllLocations { get; set; }
     
-    [Option('T', "code all topics", Required = false, HelpText = "If present, forces the (re)coding of all of the codable ad topic data")]
+    [Option('T', "code ALL topics", Required = false, HelpText = "If present, forces the (re)coding of all of the codable ad topic data")]
     public bool RecodeAllTopics { get; set; }
     
-    [Option('C', "code all conditions", Required = false, HelpText = "If present, forces the (re)coding of all of the codable ad conditions data")]
+    [Option('C', "code ALL conditions", Required = false, HelpText = "If present, forces the (re)coding of all of the codable ad conditions data")]
     public bool RecodeAllConditions { get; set; }
     
-    [Option('P', "code all publishers", Required = false, HelpText = "If present, forces the (re)coding of all of the codable ad publisher data")]
+    [Option('P', "code ALL publishers", Required = false, HelpText = "If present, forces the (re)coding of all of the codable ad publisher data")]
     public bool RecodeAllPublishers { get; set; }
 }
 

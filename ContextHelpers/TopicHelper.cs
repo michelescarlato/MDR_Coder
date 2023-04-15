@@ -342,7 +342,7 @@ namespace MDR_Coder
             // Changing to MESH codes may result in duplicate MESH terms, 
             // one of them needs to be removed...   Can be difficult to do ths with large datasets.
             
-            int rec_batch = 100000;
+            int rec_batch = 50000;
             string id_field = source_type == "study"? "sd_sid": "sd_oid";
             string topics_table = source_type == "study" ? "study_topics" : "object_topics";
             string added_records = source_type == "study" ? "ad.uncoded_study_topic_records" 
@@ -366,7 +366,7 @@ namespace MDR_Coder
                     for (int r = 1; r <= rec_count; r += rec_batch)
                     {
                         sql_string = top_sql +
-                              $" and id >= {r} and id < {r + rec_batch} "
+                              $" and t.id >= {r} and t.id < {r + rec_batch} "
                               + grouping_sql;
 
                         ExecuteSQL(sql_string);

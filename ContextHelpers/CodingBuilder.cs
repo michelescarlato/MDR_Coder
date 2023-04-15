@@ -22,6 +22,7 @@ namespace MDR_Coder
             _source = source;
             connString = source.db_conn ?? "";
             source_id = source.id ?? 0;
+            
             _opts = opts;
             _logging_helper = logging_helper;
             
@@ -123,7 +124,7 @@ namespace MDR_Coder
             org_helper.update_study_people(_opts.RecodeAllOrgs);
             if (_source.source_type != "test")
             {
-                codeEvent!.num_orgs_to_match += org_helper.store_unmatched_study_organisation_names(source_id);
+                codeEvent!.num_orgs_to_match += org_helper.store_unmatched_study_people_org_names(source_id);
             }
         }
 
@@ -138,8 +139,8 @@ namespace MDR_Coder
         
         public void UpdateStudyLocations()
         {
-            org_helper.update_studylocation_cities(_opts.RecodeAllLocations);            
-            org_helper.update_studylocation_countries(_opts.RecodeAllLocations);
+            org_helper.update_studylocation_orgs(_opts.RecodeAllLocations);            
+            //org_helper.update_studylocation_countries(_opts.RecodeAllLocations);
             if (_source.source_type != "test")
             {
                 codeEvent!.num_countries_to_match += org_helper.store_unmatched_location_country_names(source_id);
@@ -195,7 +196,7 @@ namespace MDR_Coder
             org_helper.update_object_organisations(_opts.RecodeAllOrgs);
             if (_source.source_type != "test")
             {
-                codeEvent!.num_orgs_to_match += org_helper.store_unmatched_object_people_org_names(source_id);
+                codeEvent!.num_orgs_to_match += org_helper.store_unmatched_object_organisation_org_names(source_id);
             }
         }
        
@@ -290,7 +291,7 @@ namespace MDR_Coder
                 {
                     sqlString = topSql + baseSql;
                     conn.Execute(sqlString);
-                    _logging_helper.LogLine(feedbackA + recCount + "as a single query");
+                    _logging_helper.LogLine(feedbackA + recCount + " as a single query");
                 }
             }
             catch (Exception e)

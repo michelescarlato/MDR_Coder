@@ -37,7 +37,7 @@ public class LoggingHelper : ILoggingHelper
             Directory.CreateDirectory(logFolderPath);
         }
         
-        string logFileName = "IM " + databaseName + " " + dtString + ".log";
+        string logFileName = "CD " + databaseName + " " + dtString + ".log";
         _logfilePath = Path.Combine(logFolderPath, logFileName);
         _summaryLogfilePath = Path.Combine(_summaryLogfileStartOfPath!, logFileName);
         _sw = new StreamWriter(_logfilePath, true, System.Text.Encoding.UTF8);
@@ -49,7 +49,7 @@ public class LoggingHelper : ILoggingHelper
         string dtString = DateTime.Now.ToString("s", System.Globalization.CultureInfo.InvariantCulture)
             .Replace(":", "").Replace("T", " ");
         
-        string logFileName = "IM Source not set " + dtString + ".log";
+        string logFileName = "CD Source not set " + dtString + ".log";
         _logfilePath = Path.Combine(_logfileStartOfPath!, logFileName);
         _summaryLogfilePath = Path.Combine(_summaryLogfileStartOfPath!, logFileName);
         _sw = new StreamWriter(_logfilePath, true, System.Text.Encoding.UTF8);

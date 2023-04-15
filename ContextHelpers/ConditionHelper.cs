@@ -90,7 +90,9 @@ namespace MDR_Coder
             string sql_string = top_string + @" where (lower(original_value) = '' 
                             or lower(original_value) = 'human'
                             or lower(original_value) = 'humans'
-                            or lower(original_value) = 'other') ";
+                            or lower(original_value) = 'other'
+                            or lower(original_value) = 'women'
+                            or lower(original_value) = 'men') ";
             delete_no_info_conditions(sql_string, rec_count, "A");
 
             sql_string = top_string + @" where (lower(original_value) = 'healthy adults' 
@@ -285,13 +287,13 @@ namespace MDR_Coder
 
         public int store_unmatched_condition_values(int source_id)
         {
-            string sql_string = @"delete from context_ctx.to_match_conditions where source_id = source_id";
+            string sql_string = $"delete from context_ctx.to_match_conditions where source_id = {source_id}";
             ExecuteSQL(sql_string);
-            sql_string = @"insert into context_ctx.to_match_conditions (source_id, condition_value, number_of) 
-                           select " + source_id + @", original_value, count(original_value) 
+            sql_string = $@"insert into context_ctx.to_match_conditions (source_id, condition_value, number_of) 
+                           select {source_id}, lower(original_value), count(lower(original_value)) 
                            from ad.study_conditions t 
                            where t.icd_code is null 
-                           group by t.original_value;";
+                           group by lower(original_value);";
             int res = ExecuteSQL(sql_string);
             _loggingHelper.LogLine($"Storing {res} condition codes not matched to ICD codes for review");
             return res;

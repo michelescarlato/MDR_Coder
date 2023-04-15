@@ -43,9 +43,8 @@ namespace MDR_Coder
             return conn.ExecuteScalar<int>(sql_string);
         }
 
-        private void FeedbackResults(string schema, string table_name,
-                                     string id_field, string ror_field)
-                   
+        
+        private void FeedbackResults(string schema, string table_name, string id_field, string ror_field)
         {
             int table_count = GetTableCount(schema, table_name);
             int org_id_count = GetFieldCount(schema, table_name, id_field);
@@ -54,12 +53,12 @@ namespace MDR_Coder
             _loggingHelper.LogLine($"{ror_id_count} records, from {table_count}, have ROR coded organisations in {schema}.{table_name}");
         }
         
-        private void FeedbackLocationResults(string schema, string table_name, string id_field)
+        private void FeedbackLocationResults(string schema, string entity_type, string table_name, string id_field)
                    
         {
             int table_count = GetTableCount(schema, table_name);
-            int org_id_count = GetFieldCount(schema, table_name, id_field);
-            _loggingHelper.LogLine($"{org_id_count} records, from {table_count}, have Geonames coded organisations in {schema}.{table_name}");
+            int geoname_id_count = GetFieldCount(schema, table_name, id_field);
+            _loggingHelper.LogLine($"{geoname_id_count} records, from {table_count}, have Geonames coded {entity_type} in {schema}.{table_name}");
         }
 
         // Set up relevant names for comparison
@@ -96,6 +95,8 @@ namespace MDR_Coder
 
         public void update_study_identifiers(bool code_all)
         {
+            RemoveInitialThes(_schema + ".study_identifiers", "identifier_org");
+            
             string sql_string = @"update " + _schema + @".study_identifiers i
             set identifier_org_id = n.org_id,
             coded_on = CURRENT_TIMESTAMP    
@@ -122,6 +123,8 @@ namespace MDR_Coder
 
         public void update_study_organisations(bool code_all)
         {
+            RemoveInitialThes(_schema + ".study_organisations", "organisation_name");
+            
             string sql_string = @"update " + _schema + @".study_organisations c
             set organisation_id = n.org_id,
             coded_on = CURRENT_TIMESTAMP    
@@ -147,6 +150,8 @@ namespace MDR_Coder
 
         public void update_missing_sponsor_ids()
         {
+            // seems to only apply to some CTG records
+            
             string sql_string = @"update " + _schema + @".study_identifiers si
                    set identifier_org_id = sc.organisation_id,
                    identifier_org = sc.organisation_name,
@@ -167,6 +172,8 @@ namespace MDR_Coder
 
         public void update_study_people(bool code_all)
         {
+            RemoveInitialThes(_schema + ".study_people", "organisation_name");
+            
             string sql_string = @"update " + _schema + @".study_people c
             set organisation_id = n.org_id,
             coded_on = CURRENT_TIMESTAMP    
@@ -194,6 +201,8 @@ namespace MDR_Coder
 
         public void update_object_identifiers(bool code_all)
         {
+            RemoveInitialThes(_schema + ".object_identifiers", "identifier_org");
+            
             string sql_string = @"update " + _schema + @".object_identifiers i
             set identifier_org_id = n.org_id,
             coded_on = CURRENT_TIMESTAMP    
@@ -220,6 +229,8 @@ namespace MDR_Coder
 
         public void update_object_organisations(bool code_all)
         {
+            RemoveInitialThes(_schema + ".object_organisations", "organisation_name");
+            
             string sql_string = @"update " + _schema + @".object_organisations c
             set organisation_id = n.org_id,
             coded_on = CURRENT_TIMESTAMP    
@@ -247,6 +258,8 @@ namespace MDR_Coder
 
         public void update_object_people(bool code_all)
         {
+            RemoveInitialThes(_schema + ".object_people", "organisation_name");
+            
             string sql_string = @"update " + _schema + @".object_people c
             set organisation_id = n.org_id,
             coded_on = CURRENT_TIMESTAMP    
@@ -274,6 +287,8 @@ namespace MDR_Coder
 
         public void update_data_objects(bool code_all)
         {
+            RemoveInitialThes(_schema + ".data_objects", "managing_org");
+            
             string sql_string = @"update " + _schema + @".data_objects d
             set managing_org_id = n.org_id,
             coded_on = CURRENT_TIMESTAMP          
@@ -300,6 +315,8 @@ namespace MDR_Coder
 
         public void update_object_instances(bool code_all)
         {
+            RemoveInitialThes(_schema + ".object_instances", "repository_org");
+            
             string sql_string = @"update " + _schema + @".object_instances c
             set repository_org_id = n.org_id,
             coded_on = CURRENT_TIMESTAMP
@@ -337,6 +354,9 @@ namespace MDR_Coder
         
         public void update_study_countries(bool code_all)
         {
+            int rec_batch = 200000;   // Can be difficult to do ths with large datasets.
+            int rec_count = GetTableCount(_schema, "study_countries");
+            
             string sql_string = @"update " + _schema + @".study_countries c
             set country_id = n.geoname_id,
             coded_on = CURRENT_TIMESTAMP
@@ -346,46 +366,180 @@ namespace MDR_Coder
             and lower(c.country_name) = n.name ";
             sql_string += code_all ? "" : " and coded_on is null ";
             
-            int res = Execute_SQL(sql_string);
-            _loggingHelper.LogLine($"Coded {res} country names");
+            try
+            {
+                if (rec_count > rec_batch)
+                {
+                    for (int r = 1; r <= rec_count; r += rec_batch)
+                    {
+                        string batch_sql_string = sql_string + " and c.id >= " + r + " and c.id < " + (r + rec_batch);
+                        int res_r = Execute_SQL(batch_sql_string);
+                        string feedback = $"Coded {res_r} country names - {r} to ";
+                        feedback += (r + rec_batch < rec_count) ? (r + rec_batch).ToString() : rec_count.ToString();
+                        _loggingHelper.LogLine(feedback);
+                    }
+                }
+                else
+                {
+                    int res = Execute_SQL(sql_string);
+                    _loggingHelper.LogLine($"Coded {res} country names - as a single query");
+                }
+            }
+            catch (Exception e)
+            {
+                string eres = e.Message;
+                _loggingHelper.LogError("In coding country Ids: " + eres);
+            }
             
             sql_string = @"update " + _schema + @".study_countries c
-            set country_name = n.country_name
-            from " + _schema + @".temp_country_names n 
-            where c.country_id = n.geoname_id ";
-
-            Execute_SQL(sql_string);
-            FeedbackLocationResults(_schema, "study_countries", "country_id");
+                        set country_name = n.country_name
+                        from " + _schema + @".temp_country_names n 
+                        where c.country_id = n.geoname_id ";
+            
+            try
+            {
+                if (rec_count > rec_batch)
+                {
+                    for (int r = 1; r <= rec_count; r += rec_batch)
+                    {
+                        string batch_sql_string = sql_string + " and c.id >= " + r + " and c.id < " + (r + rec_batch);
+                        int res_r = Execute_SQL(batch_sql_string);
+                        string feedback = $"Added {res_r} country default names - {r} to ";
+                        feedback += (r + rec_batch < rec_count) ? (r + rec_batch).ToString() : rec_count.ToString();
+                        _loggingHelper.LogLine(feedback);
+                        
+                    }
+                }
+                else
+                {
+                    int res = Execute_SQL(sql_string);
+                    _loggingHelper.LogLine($"Added {res} country default names - as a single query");
+                }
+            }
+            catch (Exception e)
+            {
+                string eres = e.Message;
+                _loggingHelper.LogError("In adding country default names: " + eres);
+            }
         }
-        
+           
         
         // Code location city and country codes
         
-        public void update_studylocation_cities(bool code_all)
+        public void update_studylocation_orgs(bool code_all)
         {
-            string sql_string = @"update " + _schema + @".study_locations c
-            set city_id = n.geoname_id,
-            coded_on = CURRENT_TIMESTAMP
-            from " + _schema + @".temp_city_names n
-            where c.city_id is null
-            and c.city_name is not null
-            and lower(c.city_name) = n.name ";
-            sql_string += code_all ? "" : " and coded_on is null ";
+            int rec_batch = 200000;   // Can be difficult to do ths with large datasets.
+            int rec_count = GetTableCount(_schema, "study_locations");
             
-            int res = Execute_SQL(sql_string);
-            _loggingHelper.LogLine($"Coded {res} location city and country names");
+            RemoveInitialThes(_schema + ".study_locations", "facility");
+            
+            string sql_string = @"update " + _schema + @".study_locations c
+            set facility_org_id = n.org_id
+            from " + _schema + @".temp_org_names n
+            where c.facility_org_id is null
+            and c.facility is not null
+            and lower(c.facility) = n.name ";
+            sql_string += code_all ? "" : " and coded_on is null ";
+
+            try
+            {
+                if (rec_count > rec_batch)
+                {
+                    for (int r = 1; r <= rec_count; r += rec_batch)
+                    {
+                        string batch_sql_string = sql_string + " and c.id >= " + r + " and c.id < " + (r + rec_batch);
+                        int res_r = Execute_SQL(batch_sql_string);
+                        string feedback = $"Coded {res_r} facilities in study_locations - {r} to ";
+                        feedback += (r + rec_batch < rec_count) ? (r + rec_batch).ToString() : rec_count.ToString();
+                        _loggingHelper.LogLine(feedback);
+                        
+                    }
+                }
+                else
+                {
+                    int res = Execute_SQL(sql_string);
+                    _loggingHelper.LogLine($"Coded {res} facilities in study_locations - as a single query");
+                }
+            }
+            catch (Exception e)
+            {
+                string eres = e.Message;
+                _loggingHelper.LogError("In adding location facility org ids: " + eres);
+            }
             
             sql_string = @"update " + _schema + @".study_locations c
-            set city_name = n.city_name,
-            country_id = n.country_id,
-            country_name = n.country_name
-            from " + _schema + @".temp_city_names n 
-            where c.city_id = n.geoname_id ";
+            set facility = g.default_name,
+            facility_ror_id = g.ror_id
+            from context_ctx.organisations g
+            where c.facility_org_id = g.id ";
+            sql_string += code_all ? "" : " and coded_on is null ";
+
+            try
+            {
+                if (rec_count > rec_batch)
+                {
+                    for (int r = 1; r <= rec_count; r += rec_batch)
+                    {
+                        string batch_sql_string = sql_string + " and c.id >= " + r + " and c.id < " + (r + rec_batch);
+                        int res_r = Execute_SQL(batch_sql_string);
+                        string feedback = $"Added {res_r} location facility default names - {r} to ";
+                        feedback += (r + rec_batch < rec_count) ? (r + rec_batch).ToString() : rec_count.ToString();
+                        _loggingHelper.LogLine(feedback);
+                        
+                    }
+                }
+                else
+                {
+                    int res = Execute_SQL(sql_string);
+                    _loggingHelper.LogLine($"Added {res} location facility default names - as a single query");
+                }
+            }
+            catch (Exception e)
+            {
+                string eres = e.Message;
+                _loggingHelper.LogError("In adding location facility default names: " + eres);
+            }
             
-            Execute_SQL(sql_string);
-            FeedbackLocationResults(_schema, "study_locations", "city_id");
+            
+            sql_string = @"update " + _schema + @".study_locations c
+            set city_id = locs.city_id,
+            city_name = locs.city,
+            country_id = locs.country_id,
+            country_name = locs.country,
+            coded_on = CURRENT_TIMESTAMP
+            from context_ctx.org_locations locs
+            where c.facility_org_id = locs.org_id ";
+            sql_string += code_all ? "" : " and coded_on is null ";
+            
+            try
+            {
+                if (rec_count > rec_batch)
+                {
+                    for (int r = 1; r <= rec_count; r += rec_batch)
+                    {
+                        string batch_sql_string = sql_string + " and c.id >= " + r + " and c.id < " + (r + rec_batch);
+                        int res_r = Execute_SQL(batch_sql_string);
+                        string feedback = $"Added {res_r} location city and country default names - {r} to ";
+                        feedback += (r + rec_batch < rec_count) ? (r + rec_batch).ToString() : rec_count.ToString();
+                        _loggingHelper.LogLine(feedback);
+                        
+                    }
+                }
+                else
+                {
+                    int res = Execute_SQL(sql_string);
+                    _loggingHelper.LogLine($"Added {res} location city and country default names - as a single query");
+                }
+            }
+            catch (Exception e)
+            {
+                string eres = e.Message;
+                _loggingHelper.LogError("In adding location city and country default names: " + eres);
+            }
         }
-                
+        
+        
+        /*     
         public void update_studylocation_countries(bool code_all)
         {
             string sql_string = @"update " + _schema + @".study_locations c
@@ -406,9 +560,20 @@ namespace MDR_Coder
             where c.country_id = n.geoname_id ";
 
             Execute_SQL(sql_string);
-            FeedbackLocationResults(_schema, "study_locations", "country_id");
+            FeedbackLocationResults(_schema, "countries", "study_locations", "country_id");
         }
-        
+        */
+
+
+        private void RemoveInitialThes(string table_name, string field_name)
+        {
+            string sql_string = $@"update {table_name}
+            set {field_name} = trim(substring({field_name}, 4)) 
+            where {field_name} ilike 'The %'
+            and cardinality(string_to_array({field_name} , ' ')) > 2";
+            
+            Execute_SQL(sql_string);
+        }
         
 
         // Store unmatched names (not used in testing)
@@ -542,7 +707,7 @@ namespace MDR_Coder
             string sql_string = @"delete from context_ctx.to_match_countries where source_id = "
                                 + source_id + @" and source_table = 'study_countries';
             insert into context_ctx.to_match_countries (source_id, source_table, country_name, number_of) 
-            select " + source_id + @", 'study_countries', country_name, count(source_id) 
+            select " + source_id + @", 'study_countries', country_name, count(country_name) 
             from " + _schema + @".study_countries 
             where country_id is null 
             group by country_name; ";
@@ -558,7 +723,7 @@ namespace MDR_Coder
             string sql_string = @"delete from context_ctx.to_match_countries where source_id = "
                                 + source_id + @" and source_table = 'study_locations';
             insert into context_ctx.to_match_countries (source_id, source_table, country_name, number_of) 
-            select " + source_id + @", 'study_locations', country_name, count(source_id) 
+            select " + source_id + @", 'study_locations', country_name, count(country_name) 
             from " + _schema + @".study_locations 
             where country_id is null 
             group by country_name; ";
@@ -573,8 +738,8 @@ namespace MDR_Coder
         {
             string sql_string = @"delete from context_ctx.to_match_cities where source_id = "
                                 + source_id + @" and source_table = 'study_locations';
-            insert into context_ctx.to_match_orgs (source_id, source_table, city_name, number_of) 
-            select " + source_id + @", 'study_locations', city_name, count(source_id) 
+            insert into context_ctx.to_match_cities (source_id, source_table, city_name, number_of) 
+            select " + source_id + @", 'study_locations', city_name, count(city_name) 
             from " + _schema + @".study_locations 
             where city_id is null 
             group by city_name; ";

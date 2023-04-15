@@ -54,6 +54,7 @@ public class Coder
         CodingBuilder cb = new(source, opts, _loggingHelper);
         cb.EstablishContextForeignTables(creds);
         _loggingHelper.LogLine("Foreign (mon) tables established in database");
+        
         int codingId = _monDataLayer.GetNextCodingEventId();
         CodeEvent coding = cb.CreateCodingEvent(codingId);  
         cb.EstablishTempTables();
