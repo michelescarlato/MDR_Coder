@@ -53,14 +53,7 @@ namespace MDR_Coder
             _loggingHelper.LogLine($"{ror_id_count} records, from {table_count}, have ROR coded organisations in {schema}.{table_name}");
         }
         
-        private void FeedbackLocationResults(string schema, string entity_type, string table_name, string id_field)
-                   
-        {
-            int table_count = GetTableCount(schema, table_name);
-            int geoname_id_count = GetFieldCount(schema, table_name, id_field);
-            _loggingHelper.LogLine($"{geoname_id_count} records, from {table_count}, have Geonames coded {entity_type} in {schema}.{table_name}");
-        }
-
+        
         // Set up relevant names for comparison
         public void establish_temp_tables()
         {
@@ -95,26 +88,26 @@ namespace MDR_Coder
 
         public void update_study_identifiers(bool code_all)
         {
-            RemoveInitialThes(_schema + ".study_identifiers", "identifier_org");
+            int rec_count = GetTableCount(_schema, "study_identifiers");
+            RemoveInitialThes(_schema + ".study_identifiers", "identifier_org", rec_count, 200000);
             
-            string sql_string = @"update " + _schema + @".study_identifiers i
+            string sql_string = @"update " + _schema + @".study_identifiers c
             set identifier_org_id = n.org_id,
             coded_on = CURRENT_TIMESTAMP    
             from " + _schema + @".temp_org_names n
             where identifier_org_id is null 
-            and lower(i.identifier_org) = n.name ";
+            and lower(c.identifier_org) = n.name ";
             sql_string += code_all ? "" : " and coded_on is null ";
 
-            int res = Execute_SQL(sql_string);
-            _loggingHelper.LogLine($"Coded {res} organisations in study identifiers");
+            Execute_OrgSQL(rec_count, 200000, sql_string, "Coding orgs for study identifiers");
         
-            sql_string = @"update " + _schema + @".study_identifiers i
+            sql_string = @"update " + _schema + @".study_identifiers c
             set identifier_org = g.default_name,
             identifier_org_ror_id = g.ror_id
             from context_ctx.organisations g
-            where i.identifier_org_id = g.id ";
+            where c.identifier_org_id = g.id ";
             
-            Execute_SQL(sql_string);
+            Execute_OrgSQL(rec_count, 200000, sql_string, "Inserting default org data for study identifiers");
             FeedbackResults(_schema, "study_identifiers", "identifier_org_id", "identifier_org_ror_id");
         }
 
@@ -123,7 +116,8 @@ namespace MDR_Coder
 
         public void update_study_organisations(bool code_all)
         {
-            RemoveInitialThes(_schema + ".study_organisations", "organisation_name");
+            int rec_count = GetTableCount(_schema, "study_organisations");
+            RemoveInitialThes(_schema + ".study_organisations", "organisation_name", rec_count, 200000);
             
             string sql_string = @"update " + _schema + @".study_organisations c
             set organisation_id = n.org_id,
@@ -134,8 +128,7 @@ namespace MDR_Coder
             and lower(c.organisation_name) = n.name ";
             sql_string += code_all ? "" : " and coded_on is null ";
             
-            int res = Execute_SQL(sql_string);
-            _loggingHelper.LogLine($"Coded {res} organisations in study organisations");        
+            Execute_OrgSQL(rec_count, 200000, sql_string, "Coding orgs for study organisations");   
             
             sql_string = @"update " + _schema + @".study_organisations c
             set organisation_name = g.default_name,
@@ -143,7 +136,7 @@ namespace MDR_Coder
             from context_ctx.organisations g
             where c.organisation_id = g.id ";
 
-            Execute_SQL(sql_string);
+            Execute_OrgSQL(rec_count, 200000, sql_string, "Inserting default org data for study organisations");
             FeedbackResults(_schema, "study_organisations", "organisation_id", "organisation_ror_id");
         }
 
@@ -152,19 +145,20 @@ namespace MDR_Coder
         {
             // seems to only apply to some CTG records
             
-            string sql_string = @"update " + _schema + @".study_identifiers si
+            int rec_count = GetTableCount(_schema, "study_identifiers");
+            
+            string sql_string = @"update " + _schema + @".study_identifiers c
                    set identifier_org_id = sc.organisation_id,
                    identifier_org = sc.organisation_name,
                    identifier_org_ror_id = sc.organisation_ror_id,
                    coded_on = CURRENT_TIMESTAMP    
                    from " + _schema + @".study_organisations sc
-                   where si.sd_sid = sc.sd_sid
-                   and (si.identifier_org ilike 'sponsor' 
-                   or si.identifier_org ilike 'company internal')
+                   where c.sd_sid = sc.sd_sid
+                   and (c.identifier_org ilike 'sponsor' 
+                   or c.identifier_org ilike 'company internal')
                    and sc.contrib_type_id = 54 ";
 
-            int res = Execute_SQL(sql_string);
-            _loggingHelper.LogLine($"Coded {res} additional sponsor organisations in study identifiers");
+            Execute_OrgSQL(rec_count, 200000, sql_string, "Updating org data for study identifiers");
         }
         
 
@@ -172,7 +166,8 @@ namespace MDR_Coder
 
         public void update_study_people(bool code_all)
         {
-            RemoveInitialThes(_schema + ".study_people", "organisation_name");
+            int rec_count = GetTableCount(_schema, "study_people");
+            RemoveInitialThes(_schema + ".study_people", "organisation_name", rec_count, 200000);
             
             string sql_string = @"update " + _schema + @".study_people c
             set organisation_id = n.org_id,
@@ -183,16 +178,15 @@ namespace MDR_Coder
             and lower(c.organisation_name) = n.name ";
             sql_string += code_all ? "" : " and coded_on is null ";
             
-            int res = Execute_SQL(sql_string);
-            _loggingHelper.LogLine($"Coded {res} organisations in study people");      
-            
+            Execute_OrgSQL(rec_count, 200000, sql_string, "Coding orgs for study people");
+
             sql_string = @"update " + _schema + @".study_people c
             set organisation_name = g.default_name,
             organisation_ror_id = g.ror_id
             from context_ctx.organisations g
             where c.organisation_id = g.id ";
-
-            Execute_SQL(sql_string);
+            
+            Execute_OrgSQL(rec_count, 200000, sql_string, "Inserting default org data for study people");
             FeedbackResults(_schema, "study_people", "organisation_id", "organisation_ror_id");
         }
         
@@ -201,26 +195,26 @@ namespace MDR_Coder
 
         public void update_object_identifiers(bool code_all)
         {
-            RemoveInitialThes(_schema + ".object_identifiers", "identifier_org");
+            int rec_count = GetTableCount(_schema, "object_identifiers");
+            RemoveInitialThes(_schema + ".object_identifiers", "identifier_org", rec_count, 200000);
             
-            string sql_string = @"update " + _schema + @".object_identifiers i
+            string sql_string = @"update " + _schema + @".object_identifiers c
             set identifier_org_id = n.org_id,
             coded_on = CURRENT_TIMESTAMP    
             from " + _schema + @".temp_org_names n
             where identifier_org_id is null 
-            and lower(i.identifier_org) = n.name ";
+            and lower(c.identifier_org) = n.name ";
             sql_string += code_all ? "" : " and coded_on is null ";
             
-            int res = Execute_SQL(sql_string);
-            _loggingHelper.LogLine($"Coded {res} organisations in object identifiers");
+            Execute_OrgSQL(rec_count, 200000, sql_string, "Coding orgs for object identifiers");
         
-            sql_string = @"update " + _schema + @".object_identifiers i
+            sql_string = @"update " + _schema + @".object_identifiers c
             set identifier_org = g.default_name,
             identifier_org_ror_id = g.ror_id
             from context_ctx.organisations g
-            where i.identifier_org_id = g.id ";
-
-            Execute_SQL(sql_string);
+            where c.identifier_org_id = g.id ";
+ 
+            Execute_OrgSQL(rec_count, 200000, sql_string, "Inserting default org data for object identifiers");
             FeedbackResults(_schema, "object_identifiers", "identifier_org_id", "identifier_org_ror_id");
         }
 
@@ -229,7 +223,8 @@ namespace MDR_Coder
 
         public void update_object_organisations(bool code_all)
         {
-            RemoveInitialThes(_schema + ".object_organisations", "organisation_name");
+            int rec_count = GetTableCount(_schema, "object_organisations");
+            RemoveInitialThes(_schema + ".object_organisations", "organisation_name", rec_count, 200000);
             
             string sql_string = @"update " + _schema + @".object_organisations c
             set organisation_id = n.org_id,
@@ -240,8 +235,7 @@ namespace MDR_Coder
             and lower(c.organisation_name) = n.name ";
             sql_string += code_all ? "" : " and coded_on is null ";
 
-            int res = Execute_SQL(sql_string);
-            _loggingHelper.LogLine($"Coded {res} organisations in object organisations");
+            Execute_OrgSQL(rec_count, 200000, sql_string, "Coding orgs for object organisations");
             
             sql_string = @"update " + _schema + @".object_organisations c
             set organisation_name = g.default_name,
@@ -249,7 +243,7 @@ namespace MDR_Coder
             from context_ctx.organisations g
             where c.organisation_id = g.id ";
 
-            Execute_SQL(sql_string);
+            Execute_OrgSQL(rec_count, 200000, sql_string, "Inserting default org data for object organisations");
             FeedbackResults(_schema, "object_organisations", "organisation_id", "organisation_ror_id");
         }
 
@@ -258,7 +252,8 @@ namespace MDR_Coder
 
         public void update_object_people(bool code_all)
         {
-            RemoveInitialThes(_schema + ".object_people", "organisation_name");
+            int rec_count = GetTableCount(_schema, "object_people");
+            RemoveInitialThes(_schema + ".object_people", "organisation_name", rec_count, 200000);
             
             string sql_string = @"update " + _schema + @".object_people c
             set organisation_id = n.org_id,
@@ -269,8 +264,7 @@ namespace MDR_Coder
             and lower(c.organisation_name) = n.name ";
             sql_string += code_all ? "" : " and coded_on is null ";
 
-            int res = Execute_SQL(sql_string);
-            _loggingHelper.LogLine($"Coded {res} organisations in object people");
+            Execute_OrgSQL(rec_count, 200000, sql_string, "Coding orgs for object people");
             
             sql_string = @"update " + _schema + @".object_people c
             set organisation_name = g.default_name,
@@ -278,7 +272,7 @@ namespace MDR_Coder
             from context_ctx.organisations g
             where c.organisation_id = g.id ";
 
-            Execute_SQL(sql_string);
+            Execute_OrgSQL(rec_count, 200000, sql_string, "Inserting default org data for object people");
             FeedbackResults(_schema, "object_people", "organisation_id", "organisation_ror_id");
         }
         
@@ -287,26 +281,26 @@ namespace MDR_Coder
 
         public void update_data_objects(bool code_all)
         {
-            RemoveInitialThes(_schema + ".data_objects", "managing_org");
+            int rec_count = GetTableCount(_schema, "data_objects");
+            RemoveInitialThes(_schema + ".data_objects", "managing_org", rec_count, 200000);
             
-            string sql_string = @"update " + _schema + @".data_objects d
+            string sql_string = @"update " + _schema + @".data_objects c
             set managing_org_id = n.org_id,
             coded_on = CURRENT_TIMESTAMP          
             from " + _schema + @".temp_org_names n
-            where lower(d.managing_org) = n.name
-            and d.managing_org_id is null ";
+            where lower(c.managing_org) = n.name
+            and c.managing_org_id is null ";
             sql_string += code_all ? "" : " and coded_on is null ";
 
-            int res = Execute_SQL(sql_string);
-            _loggingHelper.LogLine($"Coded {res} organisations as data object managers");
+            Execute_OrgSQL(rec_count, 200000, sql_string, "Coding managing orgs for data objects");
             
-            sql_string = @"update " + _schema + @".data_objects d
+            sql_string = @"update " + _schema + @".data_objects c
             set managing_org = g.default_name,
             managing_org_ror_id = g.ror_id
             from context_ctx.organisations g
-            where d.managing_org_id = g.id ";
+            where c.managing_org_id = g.id ";
 
-            Execute_SQL(sql_string);
+            Execute_OrgSQL(rec_count, 200000, sql_string, "Inserting default org data for data objects");
             FeedbackResults(_schema, "data_objects", "managing_org_id", "managing_org_ror_id");
         }
         
@@ -315,7 +309,8 @@ namespace MDR_Coder
 
         public void update_object_instances(bool code_all)
         {
-            RemoveInitialThes(_schema + ".object_instances", "repository_org");
+            int rec_count = GetTableCount(_schema, "object_instances");
+            RemoveInitialThes(_schema + ".object_instances", "repository_org", rec_count, 200000);
             
             string sql_string = @"update " + _schema + @".object_instances c
             set repository_org_id = n.org_id,
@@ -326,8 +321,7 @@ namespace MDR_Coder
             and lower(c.repository_org) = n.name ";
             sql_string += code_all ? "" : " and coded_on is null ";
 
-            int res = Execute_SQL(sql_string);
-            _loggingHelper.LogLine($"Coded {res} organisations in object instances");
+            Execute_OrgSQL(rec_count, 200000, sql_string, "Coding orgs for object instances");
             
             sql_string = @"update " + _schema + @".object_instances c
             set repository_org = g.default_name,
@@ -335,10 +329,38 @@ namespace MDR_Coder
             from context_ctx.organisations g
             where c.repository_org_id = g.id ";
 
-            Execute_SQL(sql_string);
+            Execute_OrgSQL(rec_count, 200000, sql_string, "Inserting default org data for object instances");
             FeedbackResults(_schema, "object_instances", "repository_org_id", "repository_org_ror_id");
         }
 
+        private void Execute_OrgSQL(int rec_count, int rec_batch, string base_sql, string action)
+        {
+            try
+            {
+                if (rec_count > rec_batch)
+                {
+                    for (int r = 1; r <= rec_count; r += rec_batch)
+                    {
+                        string batch_sql_string = base_sql + " and c.id >= " + r + " and c.id < " + (r + rec_batch);
+                        Execute_SQL(batch_sql_string);
+                        string feedback = $"{action} - records {r} to ";
+                        feedback += (r + rec_batch < rec_count) ? (r + rec_batch).ToString() : rec_count.ToString();
+                        _loggingHelper.LogLine(feedback);
+                    }
+                }
+                else
+                {
+                    int res = Execute_SQL(base_sql);
+                    _loggingHelper.LogLine($"{action} - {res} done as a single query");
+                }
+            }
+            catch (Exception e)
+            {
+                string eres = e.Message;
+                _loggingHelper.LogError($"In {action}: " + eres);
+            }
+        }
+        
         
         public void delete_temp_tables()
         {
@@ -354,7 +376,6 @@ namespace MDR_Coder
         
         public void update_study_countries(bool code_all)
         {
-            int rec_batch = 200000;   // Can be difficult to do ths with large datasets.
             int rec_count = GetTableCount(_schema, "study_countries");
             
             string sql_string = @"update " + _schema + @".study_countries c
@@ -365,62 +386,16 @@ namespace MDR_Coder
             and c.country_name is not null
             and lower(c.country_name) = n.name ";
             sql_string += code_all ? "" : " and coded_on is null ";
-            
-            try
-            {
-                if (rec_count > rec_batch)
-                {
-                    for (int r = 1; r <= rec_count; r += rec_batch)
-                    {
-                        string batch_sql_string = sql_string + " and c.id >= " + r + " and c.id < " + (r + rec_batch);
-                        int res_r = Execute_SQL(batch_sql_string);
-                        string feedback = $"Coded {res_r} country names - {r} to ";
-                        feedback += (r + rec_batch < rec_count) ? (r + rec_batch).ToString() : rec_count.ToString();
-                        _loggingHelper.LogLine(feedback);
-                    }
-                }
-                else
-                {
-                    int res = Execute_SQL(sql_string);
-                    _loggingHelper.LogLine($"Coded {res} country names - as a single query");
-                }
-            }
-            catch (Exception e)
-            {
-                string eres = e.Message;
-                _loggingHelper.LogError("In coding country Ids: " + eres);
-            }
+
+            Execute_LocationSQL(rec_count, 200000, sql_string, "Coding country names");
             
             sql_string = @"update " + _schema + @".study_countries c
                         set country_name = n.country_name
                         from " + _schema + @".temp_country_names n 
                         where c.country_id = n.geoname_id ";
+            sql_string += code_all ? "" : " and coded_on is null ";
             
-            try
-            {
-                if (rec_count > rec_batch)
-                {
-                    for (int r = 1; r <= rec_count; r += rec_batch)
-                    {
-                        string batch_sql_string = sql_string + " and c.id >= " + r + " and c.id < " + (r + rec_batch);
-                        int res_r = Execute_SQL(batch_sql_string);
-                        string feedback = $"Added {res_r} country default names - {r} to ";
-                        feedback += (r + rec_batch < rec_count) ? (r + rec_batch).ToString() : rec_count.ToString();
-                        _loggingHelper.LogLine(feedback);
-                        
-                    }
-                }
-                else
-                {
-                    int res = Execute_SQL(sql_string);
-                    _loggingHelper.LogLine($"Added {res} country default names - as a single query");
-                }
-            }
-            catch (Exception e)
-            {
-                string eres = e.Message;
-                _loggingHelper.LogError("In adding country default names: " + eres);
-            }
+            Execute_LocationSQL(rec_count, 200000, sql_string, "Inserting default country names");
         }
            
         
@@ -428,10 +403,9 @@ namespace MDR_Coder
         
         public void update_studylocation_orgs(bool code_all)
         {
-            int rec_batch = 200000;   // Can be difficult to do ths with large datasets.
             int rec_count = GetTableCount(_schema, "study_locations");
             
-            RemoveInitialThes(_schema + ".study_locations", "facility");
+            RemoveInitialThes(_schema + ".study_locations", "facility", rec_count, 200000);
             
             string sql_string = @"update " + _schema + @".study_locations c
             set facility_org_id = n.org_id
@@ -441,31 +415,7 @@ namespace MDR_Coder
             and lower(c.facility) = n.name ";
             sql_string += code_all ? "" : " and coded_on is null ";
 
-            try
-            {
-                if (rec_count > rec_batch)
-                {
-                    for (int r = 1; r <= rec_count; r += rec_batch)
-                    {
-                        string batch_sql_string = sql_string + " and c.id >= " + r + " and c.id < " + (r + rec_batch);
-                        int res_r = Execute_SQL(batch_sql_string);
-                        string feedback = $"Coded {res_r} facilities in study_locations - {r} to ";
-                        feedback += (r + rec_batch < rec_count) ? (r + rec_batch).ToString() : rec_count.ToString();
-                        _loggingHelper.LogLine(feedback);
-                        
-                    }
-                }
-                else
-                {
-                    int res = Execute_SQL(sql_string);
-                    _loggingHelper.LogLine($"Coded {res} facilities in study_locations - as a single query");
-                }
-            }
-            catch (Exception e)
-            {
-                string eres = e.Message;
-                _loggingHelper.LogError("In adding location facility org ids: " + eres);
-            }
+            Execute_LocationSQL(rec_count, 200000, sql_string, "Coding facility names");
             
             sql_string = @"update " + _schema + @".study_locations c
             set facility = g.default_name,
@@ -473,33 +423,8 @@ namespace MDR_Coder
             from context_ctx.organisations g
             where c.facility_org_id = g.id ";
             sql_string += code_all ? "" : " and coded_on is null ";
-
-            try
-            {
-                if (rec_count > rec_batch)
-                {
-                    for (int r = 1; r <= rec_count; r += rec_batch)
-                    {
-                        string batch_sql_string = sql_string + " and c.id >= " + r + " and c.id < " + (r + rec_batch);
-                        int res_r = Execute_SQL(batch_sql_string);
-                        string feedback = $"Added {res_r} location facility default names - {r} to ";
-                        feedback += (r + rec_batch < rec_count) ? (r + rec_batch).ToString() : rec_count.ToString();
-                        _loggingHelper.LogLine(feedback);
-                        
-                    }
-                }
-                else
-                {
-                    int res = Execute_SQL(sql_string);
-                    _loggingHelper.LogLine($"Added {res} location facility default names - as a single query");
-                }
-            }
-            catch (Exception e)
-            {
-                string eres = e.Message;
-                _loggingHelper.LogError("In adding location facility default names: " + eres);
-            }
             
+            Execute_LocationSQL(rec_count, 200000, sql_string, "Inserting default facility names");
             
             sql_string = @"update " + _schema + @".study_locations c
             set city_id = locs.city_id,
@@ -511,68 +436,72 @@ namespace MDR_Coder
             where c.facility_org_id = locs.org_id ";
             sql_string += code_all ? "" : " and coded_on is null ";
             
+            Execute_LocationSQL(rec_count, 200000, sql_string, "Added location city and country default names");
+        }
+
+        
+        private void Execute_LocationSQL(int rec_count, int rec_batch, string base_sql, string action )
+        {
             try
             {
                 if (rec_count > rec_batch)
                 {
                     for (int r = 1; r <= rec_count; r += rec_batch)
                     {
-                        string batch_sql_string = sql_string + " and c.id >= " + r + " and c.id < " + (r + rec_batch);
-                        int res_r = Execute_SQL(batch_sql_string);
-                        string feedback = $"Added {res_r} location city and country default names - {r} to ";
+                        string batch_sql_string = base_sql + " and c.id >= " + r + " and c.id < " + (r + rec_batch);
+                        Execute_SQL(batch_sql_string);
+                        string feedback = $"{action} - records {r} to ";
                         feedback += (r + rec_batch < rec_count) ? (r + rec_batch).ToString() : rec_count.ToString();
                         _loggingHelper.LogLine(feedback);
-                        
                     }
                 }
                 else
                 {
-                    int res = Execute_SQL(sql_string);
-                    _loggingHelper.LogLine($"Added {res} location city and country default names - as a single query");
+                    int res = Execute_SQL(base_sql);
+                    _loggingHelper.LogLine($"{action} - {res} done as a single query");
                 }
             }
             catch (Exception e)
             {
                 string eres = e.Message;
-                _loggingHelper.LogError("In adding location city and country default names: " + eres);
+                _loggingHelper.LogError($"In {action}: " + eres);
             }
         }
         
-        
-        /*     
-        public void update_studylocation_countries(bool code_all)
+
+        private void RemoveInitialThes(string table_name, string field_name, int rec_count, int rec_batch)
         {
-            string sql_string = @"update " + _schema + @".study_locations c
-            set country_id = n.geoname_id,
-            coded_on = CURRENT_TIMESTAMP
-            from " + _schema + @".temp_country_names n
-            where c.country_id is null
-            and c.country_name is not null
-            and lower(c.country_name) = n.name ";
-            sql_string += code_all ? "" : " and coded_on is null ";
+            string action = $"Removing initial 'The's from org names in {table_name}";
             
-            int res = Execute_SQL(sql_string);
-            _loggingHelper.LogLine($"Coded {res} additional location country names");
-            
-            sql_string = @"update " + _schema + @".study_countries c
-            set country_name = n.country_name
-            from " + _schema + @".temp_country_names n 
-            where c.country_id = n.geoname_id ";
-
-            Execute_SQL(sql_string);
-            FeedbackLocationResults(_schema, "countries", "study_locations", "country_id");
-        }
-        */
-
-
-        private void RemoveInitialThes(string table_name, string field_name)
-        {
-            string sql_string = $@"update {table_name}
+            string base_sql = $@"update {table_name} c
             set {field_name} = trim(substring({field_name}, 4)) 
             where {field_name} ilike 'The %'
             and cardinality(string_to_array({field_name} , ' ')) > 2";
             
-            Execute_SQL(sql_string);
+            try
+            {
+                if (rec_count > rec_batch)
+                {
+                    for (int r = 1; r <= rec_count; r += rec_batch)
+                    {
+                        string batch_sql_string = base_sql + " and c.id >= " + r + " and c.id < " + (r + rec_batch);
+                        Execute_SQL(batch_sql_string);
+                        string feedback = $"{action} - records {r} to ";
+                        feedback += (r + rec_batch < rec_count) ? (r + rec_batch).ToString() : rec_count.ToString();
+                        _loggingHelper.LogLine(feedback);
+                    }
+                }
+                else
+                {
+                    int res = Execute_SQL(base_sql);
+                    _loggingHelper.LogLine($"{action} - {res} done as a single query");
+                }
+            }
+            catch (Exception e)
+            {
+                string eres = e.Message;
+                _loggingHelper.LogError($"In {action}: " + eres);
+            }
         }
         
 

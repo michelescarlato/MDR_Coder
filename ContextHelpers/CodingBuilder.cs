@@ -82,9 +82,7 @@ namespace MDR_Coder
         public void ObtainPublisherInformation()
         {
             pubmed_helper.clear_publisher_names(_opts.RecodeAllPublishers);
-            pubmed_helper.obtain_publisher_names_using_eissn(_opts.RecodeAllPublishers);
-            pubmed_helper.obtain_publisher_names_using_pissn(_opts.RecodeAllPublishers);
-            pubmed_helper.obtain_publisher_names_using_journal_names(_opts.RecodeAllPublishers);
+            pubmed_helper.obtain_publisher_names(_opts.RecodeAllPublishers);
         }
 
 

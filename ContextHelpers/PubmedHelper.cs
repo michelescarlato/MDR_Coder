@@ -39,80 +39,21 @@ namespace MDR_Coder
             }
         }
 
-        // Update publisher name in journal details using eissn code.
+        // Update publisher name in journal details using nlm id
         
-        public void obtain_publisher_names_using_eissn(bool code_all)
+        public void obtain_publisher_names(bool code_all)
         {
-            string sql_string = $@"with t as (select e.eissn, p.publisher, 
-                               p.org_id, g.default_name
-                               from context_ctx.pub_eissns e
-                               inner join context_ctx.publishers p
-                               on e.pub_id = p.id
-                               inner join context_ctx.organisations g
-                               on p.org_id = g.id)
-                            update {_schema}.journal_details jd
-                            set publisher_id = t.org_id,
-                               publisher = t.default_name,
-                               coded_on = CURRENT_TIMESTAMP(0)
-                            from t
-                            where jd.eissn = t.eissn ";
+            string sql_string = $@"update {_schema}.journal_details jd
+                            set publisher = p.publisher,
+                            coded_on = CURRENT_TIMESTAMP(0)
+                            from context_ctx.periodicals p
+                            where jd.journal_nlm_id = p.nlm_unique_id ";
 
             sql_string += !code_all ? " and jd.coded_on is null;" : "";
             int res = ExecuteSQL(sql_string);
-            _loggingHelper.LogLine($"Updated {res} journal details records with publisher, from eissn");
+            _loggingHelper.LogLine($"Updated {res} journal details records with publisher, using nlm ids");
         }
-
-
-        // Update publisher name in journal details using pissn code.
         
-        public void obtain_publisher_names_using_pissn(bool code_all)
-        {
-            string sql_string = $@"with t as (select e.pissn, p.publisher, 
-                               p.org_id, g.default_name
-                               from context_ctx.pub_pissns e
-                               inner join context_ctx.publishers p
-                               on e.pub_id = p.id
-                               inner join context_ctx.organisations g
-                               on p.org_id = g.id)
-                            update {_schema}.journal_details jd
-                            set publisher_id = t.org_id,
-                               publisher = t.default_name,
-                               coded_on = CURRENT_TIMESTAMP(0)
-                            from t
-                            where jd.pissn = t.pissn
-                            and jd.publisher_id is null ";
-            
-            sql_string += !code_all ? " and jd.coded_on is null;" : "";
-            int res = ExecuteSQL(sql_string);
-            _loggingHelper.LogLine($"Updated {res} journal details records with publisher, from pissn");
-        }
-
-
-        // Update publisher name in journal details using journal title, for remainder 
-        // (but slight risk here as journal titles may not be unique).
-        
-        public void obtain_publisher_names_using_journal_names(bool code_all)
-        {
-            string sql_string = $@"with t as (select e.journal_name, p.publisher, 
-                               p.org_id, g.default_name
-                               from context_ctx.pub_journals e
-                               inner join context_ctx.publishers p
-                               on e.pub_id = p.id
-                               inner join context_ctx.organisations g
-                               on p.org_id = g.id)
-                            update {_schema}.journal_details jd
-                            set publisher_id = t.org_id,
-                               publisher = t.default_name,
-                               coded_on = CURRENT_TIMESTAMP(0)
-                            from t
-                            where lower(jd.journal_title) = lower(t.journal_name)
-                            and jd.publisher_id is null ";
-
-            sql_string += !code_all ? " and jd.coded_on is null;" : "";
-            int res = ExecuteSQL(sql_string);
-            _loggingHelper.LogLine($"Updated {res} journal details records with publisher, from journal title");
-        }
-
 
         // Then need to update 'managing organisation' (= publisher) using the data in
         // the journal_details table. Addition of ROR ids, if possible, will be done later.

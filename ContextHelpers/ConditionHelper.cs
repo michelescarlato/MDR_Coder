@@ -141,15 +141,23 @@ namespace MDR_Coder
                     {
                         string batch_sql_string = sql_string + " and id >= " + r + " and id < " + (r + rec_batch);
                         int res_r = ExecuteSQL(batch_sql_string);
-                        string feedback = $"Deleting {res_r} 'no information' conditions (group {delete_set}) - {r} to ";
-                        feedback += (r + rec_batch < rec_count) ? (r + rec_batch).ToString() : rec_count.ToString();
-                        _loggingHelper.LogLine(feedback);
+                        if (res_r > 0)
+                        {
+                            string feedback =
+                                $"Deleting {res_r} 'no information' conditions (group {delete_set}) - {r} to ";
+                            feedback += (r + rec_batch < rec_count) ? (r + rec_batch).ToString() : rec_count.ToString();
+                            _loggingHelper.LogLine(feedback);
+                        }
                     }
                 }
                 else
                 {
                     int res = ExecuteSQL(sql_string);
-                    _loggingHelper.LogLine($"Deleting {res} 'no information' conditions (group {delete_set}) - as a single query");
+                    if (res > 0)
+                    {
+                        _loggingHelper.LogLine(
+                            $"Deleting {res} 'no information' conditions (group {delete_set}) - as a single query");
+                    }
                 }
                 
             }
@@ -240,9 +248,11 @@ namespace MDR_Coder
         public void resolve_multiple_condition_entries(string schema, int rec_count, bool code_all)
         {
             // Consider only those with '//' in the term or code box
-            // Should all be in the most recently added / coded set onl
+            // Should all be in the most recently added / coded set only.
             // Bring them out as a temp table and split on the //, then
             // split into separate lines.
+            
+            int old_count = GetTableCount(schema, "study_conditions");
             
             string sql_string = $@"drop table if exists {schema}.temp_mult_conds;
             create table {schema}.temp_mult_conds as
@@ -281,8 +291,11 @@ namespace MDR_Coder
             
             // log revised number of records
             int new_count = GetTableCount(schema, "study_conditions");
-            _loggingHelper.LogLine(
-                $"study_conditions table has {new_count} records, after splitting of compound conditions");
+            if (new_count != old_count)
+            {
+                _loggingHelper.LogLine(
+                    $"study_conditions table has {new_count} records, after splitting of compound conditions");
+            }
         }
 
         public int store_unmatched_condition_values(int source_id)

@@ -232,15 +232,23 @@ namespace MDR_Coder
                     {
                         string batch_sql_string = sql_string + " and id >= " + r + " and id < " + (r + rec_batch);
                         int res_r = ExecuteSQL(batch_sql_string);
-                        string feedback = $"Deleting {res_r} 'no information' topics (group {delete_set}) - {r} to ";
-                        feedback += r + rec_batch < rec_count ? (r + rec_batch).ToString() : rec_count.ToString();
-                        _loggingHelper.LogLine(feedback);
+                        if (res_r > 0)
+                        {
+                            string feedback =
+                                $"Deleting {res_r} 'no information' topics (group {delete_set}) - {r} to ";
+                            feedback += r + rec_batch < rec_count ? (r + rec_batch).ToString() : rec_count.ToString();
+                            _loggingHelper.LogLine(feedback);
+                        }
                     }
                 }
                 else
                 {
                     int res =  ExecuteSQL(sql_string);
-                    _loggingHelper.LogLine($"Deleting {res} 'no information' topics (group {delete_set}) - as a single query");
+                    if (res > 0)
+                    {
+                        _loggingHelper.LogLine(
+                            $"Deleting {res} 'no information' topics (group {delete_set}) - as a single query");
+                    }
                 }
             }
             catch (Exception e)
@@ -371,10 +379,13 @@ namespace MDR_Coder
 
                         ExecuteSQL(sql_string);
                         int res_r = GetTableCount(schema, "temp_topic_dups");
-                        string feedback = $"Identifying {res_r} duplicates in {source_type} topic codes - {r} to ";
-                        feedback += (r + rec_batch < rec_count) ? (r + rec_batch).ToString() : rec_count.ToString();
-                        _loggingHelper.LogLine(feedback);
-                        delete_identified_duplicates(schema, id_field, topics_table, feedback);
+                        if (res_r > 0)
+                        {
+                            string feedback = $"Identifying {res_r} duplicates in {source_type} topic codes - {r} to ";
+                            feedback += (r + rec_batch < rec_count) ? (r + rec_batch).ToString() : rec_count.ToString();
+                            _loggingHelper.LogLine(feedback);
+                            delete_identified_duplicates(schema, id_field, topics_table, feedback);
+                        }
                     }
                 }
                 else
@@ -382,9 +393,13 @@ namespace MDR_Coder
                     sql_string = top_sql + grouping_sql;
                     ExecuteSQL(sql_string);
                     int res = GetTableCount(schema, "temp_topic_dups");
-                    string feedback = $"Identifying {res} duplicates in {source_type} topic codes - as a single query";
-                    _loggingHelper.LogLine(feedback);
-                    delete_identified_duplicates(schema, id_field, topics_table, feedback);      
+                    if (res > 0)
+                    {
+                        string feedback =
+                            $"Identifying {res} duplicates in {source_type} topic codes - as a single query";
+                        _loggingHelper.LogLine(feedback);
+                        delete_identified_duplicates(schema, id_field, topics_table, feedback); 
+                    }
                 }
 
                 // tidy up the temp tables
@@ -435,7 +450,10 @@ namespace MDR_Coder
                                where t.id = d.id;";
 
             int res = ExecuteSQL(sql_string);
-            _loggingHelper.LogLine("Deleting " + res + fback);
+            if (res > 0)
+            {
+                _loggingHelper.LogLine("Deleting " + res + fback);
+            }
 
         }
        
