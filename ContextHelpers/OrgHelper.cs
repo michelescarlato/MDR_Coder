@@ -48,9 +48,14 @@ namespace MDR_Coder
         {
             int table_count = GetTableCount(schema, table_name);
             int org_id_count = GetFieldCount(schema, table_name, id_field);
-            int ror_id_count = GetFieldCount(schema, table_name, ror_field);
-            _loggingHelper.LogLine($"{org_id_count} records, from {table_count}, have MDR coded organisations in {schema}.{table_name}");
-            _loggingHelper.LogLine($"{ror_id_count} records, from {table_count}, have ROR coded organisations in {schema}.{table_name}");
+            _loggingHelper.LogLine($"{org_id_count} records, from {table_count}, " + 
+                                   $"have MDR coded organisations in {schema}.{table_name}");
+            if (ror_field != "")
+            {
+                int ror_id_count = GetFieldCount(schema, table_name, ror_field);
+                _loggingHelper.LogLine($"{ror_id_count} records, from {table_count}, " +
+                                       $"have ROR coded organisations in {schema}.{table_name}");
+            }
         }
         
         
@@ -89,26 +94,26 @@ namespace MDR_Coder
         public void update_study_identifiers(bool code_all)
         {
             int rec_count = GetTableCount(_schema, "study_identifiers");
-            RemoveInitialThes(_schema + ".study_identifiers", "identifier_org", rec_count, 200000);
+            RemoveInitialThes(_schema + ".study_identifiers", "source", rec_count, 200000);
             
             string sql_string = @"update " + _schema + @".study_identifiers c
-            set identifier_org_id = n.org_id,
+            set source_id = n.org_id,
             coded_on = CURRENT_TIMESTAMP    
             from " + _schema + @".temp_org_names n
-            where identifier_org_id is null 
-            and lower(c.identifier_org) = n.name ";
+            where source_id is null 
+            and lower(c.source) = n.name ";
             sql_string += code_all ? "" : " and coded_on is null ";
 
-            Execute_OrgSQL(rec_count, 200000, sql_string, "Coding orgs for study identifiers");
+            Execute_OrgSQL(rec_count, 200000, sql_string, "Coding sources for study identifiers");
         
             sql_string = @"update " + _schema + @".study_identifiers c
-            set identifier_org = g.default_name,
-            identifier_org_ror_id = g.ror_id
+            set source = g.default_name,
+            source_ror_id = g.ror_id
             from context_ctx.organisations g
-            where c.identifier_org_id = g.id ";
+            where c.source_id = g.id ";
             
             Execute_OrgSQL(rec_count, 200000, sql_string, "Inserting default org data for study identifiers");
-            FeedbackResults(_schema, "study_identifiers", "identifier_org_id", "identifier_org_ror_id");
+            FeedbackResults(_schema, "study_identifiers", "source_id", "source_ror_id");
         }
 
 
@@ -148,14 +153,14 @@ namespace MDR_Coder
             int rec_count = GetTableCount(_schema, "study_identifiers");
             
             string sql_string = @"update " + _schema + @".study_identifiers c
-                   set identifier_org_id = sc.organisation_id,
-                   identifier_org = sc.organisation_name,
-                   identifier_org_ror_id = sc.organisation_ror_id,
+                   set source_id = sc.organisation_id,
+                   source = sc.organisation_name,
+                   source_ror_id = sc.organisation_ror_id,
                    coded_on = CURRENT_TIMESTAMP    
                    from " + _schema + @".study_organisations sc
                    where c.sd_sid = sc.sd_sid
-                   and (c.identifier_org ilike 'sponsor' 
-                   or c.identifier_org ilike 'company internal')
+                   and (c.source ilike 'sponsor' 
+                   or c.source ilike 'company internal')
                    and sc.contrib_type_id = 54 ";
 
             Execute_OrgSQL(rec_count, 200000, sql_string, "Updating org data for study identifiers");
@@ -196,26 +201,26 @@ namespace MDR_Coder
         public void update_object_identifiers(bool code_all)
         {
             int rec_count = GetTableCount(_schema, "object_identifiers");
-            RemoveInitialThes(_schema + ".object_identifiers", "identifier_org", rec_count, 200000);
+            RemoveInitialThes(_schema + ".object_identifiers", "source", rec_count, 200000);
             
             string sql_string = @"update " + _schema + @".object_identifiers c
-            set identifier_org_id = n.org_id,
+            set source_id = n.org_id,
             coded_on = CURRENT_TIMESTAMP    
             from " + _schema + @".temp_org_names n
-            where identifier_org_id is null 
-            and lower(c.identifier_org) = n.name ";
+            where source_id is null 
+            and lower(c.source) = n.name ";
             sql_string += code_all ? "" : " and coded_on is null ";
             
-            Execute_OrgSQL(rec_count, 200000, sql_string, "Coding orgs for object identifiers");
+            Execute_OrgSQL(rec_count, 200000, sql_string, "Coding sources for object identifiers");
         
             sql_string = @"update " + _schema + @".object_identifiers c
-            set identifier_org = g.default_name,
-            identifier_org_ror_id = g.ror_id
+            set source = g.default_name,
+            source_ror_id = g.ror_id
             from context_ctx.organisations g
-            where c.identifier_org_id = g.id ";
+            where c.source_id = g.id ";
  
             Execute_OrgSQL(rec_count, 200000, sql_string, "Inserting default org data for object identifiers");
-            FeedbackResults(_schema, "object_identifiers", "identifier_org_id", "identifier_org_ror_id");
+            FeedbackResults(_schema, "object_identifiers", "source_id", "source_ror_id");
         }
 
 
@@ -310,27 +315,26 @@ namespace MDR_Coder
         public void update_object_instances(bool code_all)
         {
             int rec_count = GetTableCount(_schema, "object_instances");
-            RemoveInitialThes(_schema + ".object_instances", "repository_org", rec_count, 200000);
+            RemoveInitialThes(_schema + ".object_instances", "system", rec_count, 200000);
             
             string sql_string = @"update " + _schema + @".object_instances c
-            set repository_org_id = n.org_id,
+            set system_id = n.org_id,
             coded_on = CURRENT_TIMESTAMP
             from " + _schema + @".temp_org_names n
-            where c.repository_org_id is null
-            and c.repository_org is not null
-            and lower(c.repository_org) = n.name ";
+            where c.system_id is null
+            and c.system is not null
+            and lower(c.system) = n.name ";
             sql_string += code_all ? "" : " and coded_on is null ";
 
             Execute_OrgSQL(rec_count, 200000, sql_string, "Coding orgs for object instances");
             
             sql_string = @"update " + _schema + @".object_instances c
-            set repository_org = g.default_name,
-            repository_org_ror_id = g.ror_id
+            set system = g.default_name
             from context_ctx.organisations g
-            where c.repository_org_id = g.id ";
+            where c.system_id = g.id ";
 
             Execute_OrgSQL(rec_count, 200000, sql_string, "Inserting default org data for object instances");
-            FeedbackResults(_schema, "object_instances", "repository_org_id", "repository_org_ror_id");
+            FeedbackResults(_schema, "object_instances", "system_id", "");
         }
 
         private void Execute_OrgSQL(int rec_count, int rec_batch, string base_sql, string action)
@@ -512,10 +516,10 @@ namespace MDR_Coder
             string sql_string = @"delete from context_ctx.to_match_orgs where source_id = "
             + source_id + @" and source_table = 'study_identifiers';
             insert into context_ctx.to_match_orgs (source_id, source_table, org_name, number_of) 
-            select " + source_id + @", 'study_identifiers', identifier_org, count(identifier_org) 
+            select " + source_id + @", 'study_identifiers', source, count(source) 
             from "+ _schema + @".study_identifiers 
-            where identifier_org_id is null 
-            group by identifier_org; ";
+            where source_id is null 
+            group by source; ";
 
             int res = Execute_SQL(sql_string);
             _loggingHelper.LogLine($"Stored {res} unmatched study identifier organisation names, for review");
@@ -557,10 +561,10 @@ namespace MDR_Coder
             string sql_string = @"delete from context_ctx.to_match_orgs where source_id = "
             + source_id + @" and source_table = 'object_identifiers';
             insert into context_ctx.to_match_orgs (source_id, source_table, org_name, number_of) 
-            select " + source_id + @", 'object_identifiers', identifier_org, count(identifier_org) 
+            select " + source_id + @", 'object_identifiers', source, count(source) 
             from " + _schema + @".object_identifiers 
-            where identifier_org_id is null 
-            group by identifier_org; ";
+            where source_id is null 
+            group by source; ";
 
             int res = Execute_SQL(sql_string);
             _loggingHelper.LogLine($"Stored {res} unmatched study identifier organisation names, for review");
@@ -621,10 +625,10 @@ namespace MDR_Coder
             string sql_string = @"delete from context_ctx.to_match_orgs where source_id = "
                                 + source_id + @" and source_table = 'object_instances';
             insert into context_ctx.to_match_orgs (source_id, source_table, org_name, number_of) 
-            select " + source_id + @", 'object_instances', repository_org, count(repository_org) 
+            select " + source_id + @", 'object_instances', system, count(system) 
             from " + _schema + @".object_instances 
-            where repository_org_id is null 
-            group by repository_org; ";
+            where system_id is null 
+            group by system; ";
 
             int res = Execute_SQL(sql_string); 
             _loggingHelper.LogLine($"Stored {res} unmatched object instance organisation names, for review");

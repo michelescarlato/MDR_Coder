@@ -78,8 +78,8 @@ namespace MDR_Coder
         public void update_identifiers_publisher_data(bool code_all)
         {
             string sql_string = $@"update {_schema}.object_identifiers i
-                            set identifier_org_id = jd.publisher_id,
-                            identifier_org = jd.publisher,
+                            set source_id = jd.publisher_id,
+                            source = jd.publisher,
                             coded_on = CURRENT_TIMESTAMP(0)
                             from {_schema}.journal_details jd
                             where i.sd_oid = jd.sd_oid
