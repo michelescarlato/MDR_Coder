@@ -63,10 +63,7 @@ if (paramsCheck.ParseError || paramsCheck.ValidityError)
 }
 
 // Should be able to proceed - opts and source(s) are known to be non-null.
-// For a normal run, create an Importer class and run the import process.
-// For a test run, create a test importer, which uses exactly the same code
-// but which needs to establish a framework for the test data first, and then
-// compare it with expected data afterwards.
+// Create an Importer class and run the import process.
 
 try
 {

@@ -25,11 +25,10 @@ internal class ParameterChecker
             LogParseError(((NotParsed<Options>)parsedArguments).Errors);
             return new ParamsCheckResult(true, false, null);
         }
-        else
-        {
-            var opts = parsedArguments.Value;
-            return CheckArgumentValuesAreValid(opts);
-        }
+
+        var opts = parsedArguments.Value;
+        return CheckArgumentValuesAreValid(opts);
+
     }
     
    
@@ -60,6 +59,15 @@ internal class ParameterChecker
                 opts.RecodeAllTopics = true;
                 opts.RecodeAllLocations = true;
                 opts.RecodeAllPublishers = true;
+            }
+            
+            if (opts.RecodeUnmatchedAll)    // recode ALL options force the recoding of all data, even if already coded
+            {
+                opts.RecodeUnmatchedOrgs = true;
+                opts.RecodeUnmatchedConditions = true;
+                opts.RecodeUnmatchedTopics = true;
+                opts.RecodeUnmatchedLocations = true;
+                opts.RecodeUnmatchedPublishers = true;
             }
             
             // parameters valid - return opts.
@@ -116,6 +124,24 @@ public class Options
 
     [Option('s', "source_ids", Required = false, Separator = ',', HelpText = "Comma separated list of Integer ids of data sources.")]
     public IEnumerable<int>? SourceIds { get; set; }
+    
+    [Option('a', "code unmatched", Required = false, HelpText = "If present, forces the coding of all of the unmatched codable data")]
+    public bool RecodeUnmatchedAll { get; set; }
+    
+    [Option('g', "code unmatched orgs", Required = false, HelpText = "If present, forces the (re)coding of all of the codable ad organisational data")]
+    public bool RecodeUnmatchedOrgs { get; set; }
+    
+    [Option('l', "code unmatched locations", Required = false, HelpText = "If present, forces the (re)coding of all of the codable ad country and location data data")]
+    public bool RecodeUnmatchedLocations { get; set; }
+    
+    [Option('t', "code unmatched topics", Required = false, HelpText = "If present, forces the (re)coding of all of the codable ad topic data")]
+    public bool RecodeUnmatchedTopics { get; set; }
+    
+    [Option('c', "code unmatched conditions", Required = false, HelpText = "If present, forces the (re)coding of all of the codable ad conditions data")]
+    public bool RecodeUnmatchedConditions { get; set; }
+    
+    [Option('p', "code unmatched publishers", Required = false, HelpText = "If present, forces the (re)coding of all of the codable ad publisher data")]
+    public bool RecodeUnmatchedPublishers { get; set; }
     
     [Option('A', "code ALL", Required = false, HelpText = "If present, forces the (re)coding of all of the codable data")]
     public bool RecodeAll { get; set; }

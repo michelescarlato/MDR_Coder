@@ -59,71 +59,74 @@ public class Coder
         CodeEvent coding = cb.CreateCodingEvent(codingId);  
         cb.EstablishTempTables();
         
-        // If pubmed (or includes pubmed, as with expected test data), do these updates first.
+        // If pubmed and publisher updates requested, do these updates first.
         
-        if (source.id is 100135 or 999999)
+        if (opts.RecodeAllPublishers || opts.RecodeUnmatchedPublishers)
         {
-            cb.ObtainPublisherInformation();
-            cb.ApplyPublisherData();
+            if (source.id is 100135)
+            {
+                cb.ObtainPublisherInformation();
+                cb.ApplyPublisherData();
+            }
         }
 
-        // Update and standardise organisation ids and names
-
-        if (source.has_study_tables is true || source.source_type == "test")
+        // Update and standardise study and object organisation ids and names
+        
+        if (opts.RecodeAllOrgs || opts.RecodeUnmatchedOrgs)
         {
-            cb.UpdateStudyIdentifiers();
-
-            if (source.has_study_organisations is true)
+            if (source.has_study_tables is true)
             {
-                cb.UpdateStudyOrgs();
+                cb.UpdateStudyIdentifiers();
+                cb.UpdateStudyOrgs();   // table existence checked later
+                cb.UpdateStudyPeople();   // table existence checked later
+                
+                cb.UpdateDataObjectOrgs();
+                cb.UpdateObjectInstanceOrgs();      
+               
+                if (source.has_object_pubmed_set is true)
+                {
+                    cb.UpdateObjectIdentifiers();
+                    cb.UpdateObjectPeople();
+                    cb.UpdateObjectOrganisations();
+                }
             }
-            if (source.has_study_people is true)
-            {
-                cb.UpdateStudyPeople();
-            }
-            
-            if (source.has_study_countries is true)
-            {
+        }
+        
+        
+        // Update and standardise study countries and locations.
+        
+        if (opts.RecodeAllLocations || opts.RecodeUnmatchedLocations)
+        {
                 cb.UpdateStudyCountries();
-            }
-            
-            if (source.has_study_locations is true)
-            {
-                cb.UpdateStudyLocations();
-            }
-            
-            if (source.has_study_iec is true)
-            {
-                cb.UpdateStudyIEC();
-            }
+                cb.UpdateStudyLocations();   
         }
-
-        cb.UpdateDataObjectOrgs();
-        cb.UpdateObjectInstanceOrgs();        
         
-        if (source.source_type is "test" || source.has_object_pubmed_set is true)
+        // Update and standardise topic ids and names
+
+        if (opts.RecodeAllTopics || opts.RecodeUnmatchedTopics)
         {
-            cb.UpdateObjectIdentifiers();
-            cb.UpdateObjectPeople();
-            cb.UpdateObjectOrganisations();
+            cb.UpdateTopics(source.source_type!);
         }
-
-
-        // Update and standardise topic ids and names. and condition ids and names
         
-        cb.UpdateTopics(source.source_type!);       
-        cb.UpdateConditions();
+        // Update and standardise condition ids and names
+        
+        if (opts.RecodeAllConditions || opts.RecodeUnmatchedConditions)
+        {
+            cb.UpdateConditions();
+        }
+        
         
         // Tidy up 
         
         if (source.has_study_tables is true)
         {
-            cb.UpdateStudiesImportedDateInMon(codingId);
+            _monDataLayer.UpdateStudiesCodedDate(codingId, source.db_conn);
         }
         else
         {
-            // only do the objects table if there are no studies (e.g. PubMed)
-            cb.UpdateObjectsImportedDateInMon(codingId);
+            // only do the objects table if there are no studies (e.g. PubMed).
+            
+            _monDataLayer.UpdateObjectsCodedDate(codingId, source.db_conn);
         }
         _monDataLayer.StoreCodingEvent(coding);
         

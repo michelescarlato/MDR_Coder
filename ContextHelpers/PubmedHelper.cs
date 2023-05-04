@@ -12,7 +12,7 @@ namespace MDR_Coder
         public PubmedHelper(Source source, ILoggingHelper logger)
         {
             _db_conn = source.db_conn ?? "";
-            _schema = source.source_type == "test" ? "expected" : "ad";
+            _schema = "ad";
             _loggingHelper = logger;
         }
         

@@ -13,9 +13,11 @@ namespace MDR_Coder
         
         private readonly OrgHelper org_helper;
         private readonly PubmedHelper pubmed_helper;
+        private readonly LocHelper location_helper;
         private readonly TopicHelper topic_helper;
         private readonly ConditionHelper condition_helper;
-        private CodeEvent? codeEvent = null;
+
+        private CodeEvent? codeEvent;
 
         public CodingBuilder(Source source, Options opts, ILoggingHelper logging_helper)
         {
@@ -28,6 +30,7 @@ namespace MDR_Coder
             
             pubmed_helper = new PubmedHelper(source, logging_helper);
             org_helper = new OrgHelper(source, logging_helper);
+            location_helper = new LocHelper(source, logging_helper);
             topic_helper = new TopicHelper(source, logging_helper);
             condition_helper = new ConditionHelper(source, logging_helper);
         }
@@ -35,11 +38,10 @@ namespace MDR_Coder
 
         public void EstablishContextForeignTables(Credentials creds)
         {
-            string schema = _source.source_type == "test" ? "expected" : "sd";
             using var conn = new NpgsqlConnection(connString);
             
             string sql_string = @"CREATE EXTENSION IF NOT EXISTS postgres_fdw
-                                     schema " + schema;
+                                     schema sd";   // any schema will do
             conn.Execute(sql_string);
 
             sql_string = @"CREATE SERVER IF NOT EXISTS context "
@@ -77,12 +79,14 @@ namespace MDR_Coder
         public void EstablishTempTables()
         {
             org_helper.establish_temp_tables();
+            location_helper.establish_temp_tables();
         }
 
         public void ObtainPublisherInformation()
         {
             pubmed_helper.clear_publisher_names(_opts.RecodeAllPublishers);
             pubmed_helper.obtain_publisher_names(_opts.RecodeAllPublishers);
+            _logging_helper.LogLine("");
         }
 
 
@@ -90,126 +94,103 @@ namespace MDR_Coder
         {
             pubmed_helper.update_objects_publisher_data(_opts.RecodeAllPublishers);
             pubmed_helper.update_identifiers_publisher_data(_opts.RecodeAllPublishers);
-            if (_source.source_type != "test")
-            {
-                codeEvent!.num_publishers_to_match += pubmed_helper.store_unmatched_publisher_org_names(source_id);
-            }
-        }
-
-
-        public void UpdateStudyIdentifiers()
-        {
-            org_helper.update_study_identifiers(_opts.RecodeAllOrgs);
-            if (_source.source_type != "test")
-            {
-                codeEvent!.num_orgs_to_match += org_helper.store_unmatched_study_identifiers_org_names(source_id);
-            }
+            codeEvent!.num_publishers_to_match += pubmed_helper.store_unmatched_publisher_org_names(source_id);
+            _logging_helper.LogLine("");
         }
 
         public void UpdateStudyOrgs()
         {
             org_helper.update_study_organisations(_opts.RecodeAllOrgs);
-            org_helper.update_missing_sponsor_ids();
-            if (_source.source_type != "test")
-            {
-                codeEvent!.num_orgs_to_match += org_helper.store_unmatched_study_organisation_names(source_id);
-            }
+            codeEvent!.num_orgs_to_match += org_helper.store_unmatched_study_organisation_names(source_id);
+            _logging_helper.LogLine("");
+        }
 
+        public void UpdateStudyIdentifiers()
+        {
+            org_helper.update_study_identifiers(_opts.RecodeAllOrgs);
+            codeEvent!.num_orgs_to_match += org_helper.store_unmatched_study_identifiers_org_names(source_id);
+            _logging_helper.LogLine("");
         }
 
         public void UpdateStudyPeople()
         {
             org_helper.update_study_people(_opts.RecodeAllOrgs);
-            if (_source.source_type != "test")
-            {
-                codeEvent!.num_orgs_to_match += org_helper.store_unmatched_study_people_org_names(source_id);
-            }
-        }
-
-        public void UpdateStudyCountries()
-        {
-            org_helper.update_study_countries(_opts.RecodeAllLocations);
-            if (_source.source_type != "test")
-            {
-                codeEvent!.num_countries_to_match += org_helper.store_unmatched_country_names(source_id);
-            }
+            codeEvent!.num_orgs_to_match += org_helper.store_unmatched_study_people_org_names(source_id);
+            _logging_helper.LogLine("");
         }
         
-        public void UpdateStudyLocations()
-        {
-            org_helper.update_studylocation_orgs(_opts.RecodeAllLocations);            
-            //org_helper.update_studylocation_countries(_opts.RecodeAllLocations);
-            if (_source.source_type != "test")
-            {
-                codeEvent!.num_countries_to_match += org_helper.store_unmatched_location_country_names(source_id);
-                codeEvent!.num_cities_to_match += org_helper.store_unmatched_city_names(source_id);
-            }
-        }
-
-        public void UpdateStudyIEC()
-        {
-             // to do, will probably need complex processes....
-        }
-
-
         public void UpdateDataObjectOrgs()
         {
             org_helper.update_data_objects(_opts.RecodeAllOrgs);
-            if (_source.source_type != "test")
-            {
-                codeEvent!.num_orgs_to_match += org_helper.store_unmatched_data_object_org_names(source_id);
-            }
+            codeEvent!.num_orgs_to_match += org_helper.store_unmatched_data_object_org_names(source_id);
+            _logging_helper.LogLine("");
         }
         
         public void UpdateObjectInstanceOrgs()
         {
             org_helper.update_object_instances(_opts.RecodeAllOrgs);
-            if (_source.source_type != "test")
-            {
-                codeEvent!.num_orgs_to_match += org_helper.store_unmatched_object_instance_org_names(source_id);
-            }
+            codeEvent!.num_orgs_to_match += org_helper.store_unmatched_object_instance_org_names(source_id);
+            _logging_helper.LogLine("");
         }
         
         
         public void UpdateObjectIdentifiers()
         {
             org_helper.update_object_identifiers(_opts.RecodeAllOrgs);
-            if (_source.source_type != "test")
-            {
-                codeEvent!.num_orgs_to_match += org_helper.store_unmatched_object_identifiers_org_names(source_id);
-            }
+            codeEvent!.num_orgs_to_match += org_helper.store_unmatched_object_identifiers_org_names(source_id);
+            _logging_helper.LogLine("");
         }
 
         public void UpdateObjectPeople()
         {
-            org_helper.update_object_people(_opts.RecodeAllOrgs);
-            if (_source.source_type != "test")
+            if (_source.has_study_people is true)
             {
+                org_helper.update_object_people(_opts.RecodeAllOrgs);
                 codeEvent!.num_orgs_to_match += org_helper.store_unmatched_object_people_org_names(source_id);
+                _logging_helper.LogLine("");
             }
         }
         
         public void UpdateObjectOrganisations()
         {
-            org_helper.update_object_organisations(_opts.RecodeAllOrgs);
-            if (_source.source_type != "test")
+            if (_source.has_study_organisations is true)
             {
+                org_helper.update_object_organisations(_opts.RecodeAllOrgs);
                 codeEvent!.num_orgs_to_match += org_helper.store_unmatched_object_organisation_org_names(source_id);
+                _logging_helper.LogLine("");
             }
         }
-       
+        
+        public void UpdateStudyCountries()
+        {
+            if (_source.has_study_countries is true)
+            {
+                location_helper.update_study_countries(_opts.RecodeAllLocations);
+                codeEvent!.num_countries_to_match += location_helper.store_unmatched_country_names(source_id);
+                _logging_helper.LogLine("");
+            }
+        }
+        
+        public void UpdateStudyLocations()
+        {
+            if (_source.has_study_locations is true)
+            {
+                location_helper.update_studylocation_orgs(_opts.RecodeAllLocations);
+                codeEvent!.num_countries_to_match += location_helper.store_unmatched_location_country_names(source_id);
+                codeEvent!.num_cities_to_match += location_helper.store_unmatched_city_names(source_id);
+                _logging_helper.LogLine("");
+            }
+        }
+
         
         public void UpdateTopics(string source_type)
         {
             if (_source is { source_type: "study", has_study_topics: true }
-                 || source_type != "study")
+                 || source_type == "object")
             {
                 topic_helper.process_topics(_opts.RecodeAllTopics);
-
-                if (_source.source_type != "test")
-                {
-                    codeEvent!.num_topics_to_match += topic_helper.store_unmatched_topic_values(source_type, source_id);
-                }
+                codeEvent!.num_topics_to_match += topic_helper.store_unmatched_topic_values(source_type, source_id);
+                _logging_helper.LogLine("");  
             }
         }
         
@@ -218,87 +199,25 @@ namespace MDR_Coder
             if (_source.has_study_conditions is true)
             {
                 condition_helper.process_conditions(_opts.RecodeAllConditions);
-
-                if (_source.source_type != "test")
-                {
-                    codeEvent!.num_conditions_to_match += condition_helper.store_unmatched_condition_values(source_id);
-                }
+                codeEvent!.num_conditions_to_match += condition_helper.store_unmatched_condition_values(source_id);
+               _logging_helper.LogLine("");                
             }
         }
-
+        
+        /*
+        public void UpdateStudyIEC()
+        {
+             // to do, will probably need complex processes....
+        }
+        */
+ 
         public void DropTempTables()
         {
             org_helper.delete_temp_tables();
+            location_helper.delete_temp_tables();
             topic_helper.delete_temp_tables();
-            condition_helper.delete_temp_tables();
         }
         
-        
-        public void UpdateStudiesImportedDateInMon(int codingId)
-        {
-            string top_string = @"Update mn.source_data src
-                      set last_coding_id = " + codingId + @", 
-                      last_coded = current_timestamp
-                      from 
-                         (select so.sd_sid 
-                         FROM sd.studies so ";
-            string base_string = @" ) s
-                          where s.sd_sid = src.sd_sid;";
-
-            UpdateLastImportedDate("studies", top_string, base_string);
-        }
-
-    
-        public void UpdateObjectsImportedDateInMon(int codingId)
-        {
-            string top_string = @"UPDATE mn.source_data src
-                      set last_coding_id = " + codingId + @", 
-                      last_coded = current_timestamp
-                      from 
-                         (select so.sd_oid 
-                          FROM sd.data_objects so ";
-            string base_string = @" ) s
-                          where s.sd_oid = src.sd_oid;";
-
-            UpdateLastImportedDate("data_objects", top_string, base_string);
-        }
-
-        private void UpdateLastImportedDate(string tableName, string topSql, string baseSql)
-        {
-            try
-            {   
-                using NpgsqlConnection conn = new(connString);
-                string feedbackA = "Updating monitor records with date time of coding, ";
-                string sqlString = $"select count(*) from sd.{tableName}";
-                int recCount  = conn.ExecuteScalar<int>(sqlString);
-                int recBatch = 50000;
-                if (recCount > recBatch)
-                {
-                    for (int r = 1; r <= recCount; r += recBatch)
-                    {
-                        sqlString = topSql + 
-                                    " where so.id >= " + r + " and so.id < " + (r + recBatch)
-                                    + baseSql;
-                        conn.Execute(sqlString);
-                        string feedback = feedbackA + r + " to ";
-                        feedback += (r + recBatch < recCount) ? (r + recBatch - 1).ToString() : recCount.ToString();
-                        _logging_helper.LogLine(feedback);
-                    }
-                }
-                else
-                {
-                    sqlString = topSql + baseSql;
-                    conn.Execute(sqlString);
-                    _logging_helper.LogLine(feedbackA + recCount + " as a single query");
-                }
-            }
-            catch (Exception e)
-            {
-                string res = e.Message;
-                _logging_helper.LogError("In update last imported date (" + tableName + "): " + res);
-            }
-        }
-
         
         public void DropContextForeignTables()
         {
