@@ -188,7 +188,7 @@ public class OrgHelper
         string action = $"Coding orgs for {qualifier} study people";
         Execute_OrgSQL(min_id, max_id, 200000, sql_string, action);
 
-        sql_string = @"update {_schema}.study_people c
+        sql_string = $@"update {_schema}.study_people c
         set organisation_name = g.default_name,
         organisation_ror_id = g.ror_id,
         coded_on = CURRENT_TIMESTAMP    
@@ -221,7 +221,7 @@ public class OrgHelper
         string action = $"Coding sources for {qualifier} object identifiers";
         Execute_OrgSQL(min_id, max_id, 200000, sql_string, action);
     
-        sql_string = @"update {_schema}.object_identifiers c
+        sql_string = $@"update {_schema}.object_identifiers c
         set source = g.default_name,
         source_ror_id = g.ror_id,
         coded_on = CURRENT_TIMESTAMP 
@@ -462,7 +462,7 @@ public class OrgHelper
     public int store_unmatched_study_organisation_names(int source_id)
     {
         string sql_string = $@"delete from context_ctx.to_match_orgs 
-                               where source_id = = {source_id}  
+                               where source_id = {source_id}  
                                and source_table = 'study_organisations';";
         Execute_SQL(sql_string); 
         sql_string = $@"insert into context_ctx.to_match_orgs (source_id, source_table, org_name, number_of) 
@@ -479,7 +479,7 @@ public class OrgHelper
     public int store_unmatched_study_people_org_names(int source_id)
     {
         string sql_string = $@"delete from context_ctx.to_match_orgs 
-                               where source_id = = {source_id}  
+                               where source_id = {source_id}  
                                and source_table = 'study_people';";
         Execute_SQL(sql_string); 
         sql_string = $@"insert into context_ctx.to_match_orgs (source_id, source_table, org_name, number_of) 
@@ -496,7 +496,7 @@ public class OrgHelper
     public int store_unmatched_object_identifiers_org_names(int source_id)
     {
         string sql_string = $@"delete from context_ctx.to_match_orgs 
-                               where source_id = = {source_id}  
+                               where source_id = {source_id}  
                                and source_table = 'object_identifiers';";
         Execute_SQL(sql_string); 
         sql_string = $@"insert into context_ctx.to_match_orgs (source_id, source_table, org_name, number_of) 
@@ -514,7 +514,7 @@ public class OrgHelper
     public int store_unmatched_object_organisation_org_names(int source_id)
     {
         string sql_string = $@"delete from context_ctx.to_match_orgs 
-                               where source_id = = {source_id} 
+                               where source_id = {source_id} 
                                and source_table = 'object_organisations';";
         Execute_SQL(sql_string); 
         sql_string = $@"insert into context_ctx.to_match_orgs (source_id, source_table, org_name, number_of) 
@@ -532,7 +532,7 @@ public class OrgHelper
     public int store_unmatched_object_people_org_names(int source_id)
     {
         string sql_string = $@"delete from context_ctx.to_match_orgs 
-                               where source_id = = {source_id}  
+                               where source_id = {source_id}  
                                and source_table = 'object_people';";
         Execute_SQL(sql_string); 
         sql_string = $@"insert into context_ctx.to_match_orgs (source_id, source_table, org_name, number_of) 
@@ -550,7 +550,7 @@ public class OrgHelper
     public int store_unmatched_data_object_org_names(int source_id)
     {
         string sql_string = $@"delete from context_ctx.to_match_orgs 
-                               where source_id = = {source_id} 
+                               where source_id = {source_id} 
                                and source_table = 'data_objects';";
         Execute_SQL(sql_string); 
         sql_string = $@"insert into context_ctx.to_match_orgs (source_id, source_table, org_name, number_of) 
@@ -568,7 +568,7 @@ public class OrgHelper
     public int store_unmatched_object_instance_org_names(int source_id)
     {
         string sql_string = $@"delete from context_ctx.to_match_orgs 
-                               where source_id = = {source_id} 
+                               where source_id = {source_id} 
                                and source_table = 'object_instances';";
         Execute_SQL(sql_string); 
         sql_string = $@"insert into context_ctx.to_match_orgs (source_id, source_table, org_name, number_of) 

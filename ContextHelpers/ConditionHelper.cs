@@ -91,6 +91,7 @@ public class ConditionHelper
                         or lower(original_value) = 'humans'
                         or lower(original_value) = 'other'
                         or lower(original_value) = 'women'
+                        or lower(original_value) = 'child'
                         or lower(original_value) = 'adolescent'
                         or lower(original_value) = 'adolescents'
                         or lower(original_value) = 'men') ";
@@ -124,9 +125,44 @@ public class ConditionHelper
                         or lower(original_value) = 'toxicity' 
                         or lower(original_value) = 'health condition 1: o- medical and surgical') ";
         delete_no_info_conditions(sql_string, min_id, max_id, "D", code_all, rec_batch);
+        
+        sql_string = top_string + @" where (lower(original_value) = 'body weight' 
+                        or lower(original_value) = 'disease'
+                        or lower(original_value) = 'emergencies'
+                        or lower(original_value) = 'healthy'
+                        or lower(original_value) = 'inflammation'
+                        or lower(original_value) = 'ischemia'
+                        or lower(original_value) = 'sclerosis'
+                        or lower(original_value) = 'thrombosis' 
+                        or lower(original_value) = 'ulcer') ";
+        delete_no_info_conditions(sql_string, min_id, max_id, "E", code_all, rec_batch);
+        
+        sql_string = top_string + @" where (lower(original_value) = 'body weight' 
+                        or lower(original_value) = 'surgery'
+                        or lower(original_value) = 'syndrome'
+                        or lower(original_value) = 'sleep'
+                        or lower(original_value) = 'public health'
+                        or lower(original_value) = 'public health - epidemiology'
+                        or lower(original_value) = 'public health - health promotion/education'
+                        or lower(original_value) = 'quality of life' 
+                        or lower(original_value) = 'recurrence') ";
+        delete_no_info_conditions(sql_string, min_id, max_id, "F", code_all, rec_batch);
+        
+        sql_string = top_string + @" where (lower(original_value) = 'pharmacokinetic study' 
+                        or lower(original_value) = 'pharmacokinetics and bioequivalence study in human'
+                        or lower(original_value) = 'physical activity'
+                        or lower(original_value) = 'physical function'
+                        or lower(original_value) = 'physical inactivity'
+                        or lower(original_value) = 'infarction'
+                        or lower(original_value) = 'fibrosis'
+                        or lower(original_value) = 'constriction, pathologic' 
+                        or lower(original_value) = 'critical illness'
+                        or lower(original_value) = 'critically ill patients' 
+                        or lower(original_value) = 'chronic disease') ";
+        delete_no_info_conditions(sql_string, min_id, max_id, "G", code_all, rec_batch);
     }
 
-
+ 
     public void delete_no_info_conditions(string sql_string, int min_id, int max_id, 
                                           string delete_set, bool code_all, int rec_batch)
     {
@@ -170,9 +206,9 @@ public class ConditionHelper
         string sql_string = $@"Update {schema}.study_conditions t
                          set icd_code = m.icd_code, icd_name = m.icd_term,
                          coded_on = CURRENT_TIMESTAMP
-                         from context_ctx.icd_lookup m
+                         from context_ctx.icd_codes_lookup m
                          where t.original_ct_code  = m.entry_code 
-                         and t.original_ct_type_id = m.entry_type_id ";
+                         and t.original_ct_type_id = m.entry_code_type_id ";
         sql_string += code_all ? "" : " and coded_on is null ";
         string feedback_core = "study condition codes, using codes";
         try
@@ -181,7 +217,7 @@ public class ConditionHelper
             {
                 for (int r = min_id; r <= max_id; r += rec_batch)
                 {
-                    string batch_sql_string = sql_string + " and id >= " + r + " and id < " + (r + rec_batch);
+                    string batch_sql_string = sql_string + " and t.id >= " + r + " and t.id < " + (r + rec_batch);
                     int res_r = ExecuteSQL(batch_sql_string);
                     int e = r + rec_batch < max_id ? r + rec_batch : max_id;
                     _loggingHelper.LogLine($"Updating {res_r} {feedback_core} - {r} to {e}");
@@ -206,7 +242,7 @@ public class ConditionHelper
         string sql_string = $@"Update {schema}.study_conditions t
                          set icd_code = m.icd_code, icd_name = m.icd_term,
                          coded_on = CURRENT_TIMESTAMP
-                         from context_ctx.icd_lookup m
+                         from context_ctx.icd_terms_lookup m
                          where lower(t.original_value) = m.entry_lower ";
         sql_string += code_all ? "" : " and coded_on is null ";
         string feedback_core = "study condition codes, using terms";
@@ -216,7 +252,7 @@ public class ConditionHelper
             {
                 for (int r = min_id; r <= max_id; r += rec_batch)
                 {
-                    string batch_sql_string = sql_string + " and id >= " + r + " and id < " + (r + rec_batch);
+                    string batch_sql_string = sql_string + " and t.id >= " + r + " and t.id < " + (r + rec_batch);
                     int res_r = ExecuteSQL(batch_sql_string);
                     int e = r + rec_batch < max_id ? r + rec_batch : max_id;
                     _loggingHelper.LogLine($"Updating {res_r} {feedback_core} - {r} to {e}");

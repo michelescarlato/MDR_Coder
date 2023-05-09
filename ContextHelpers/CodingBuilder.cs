@@ -97,26 +97,32 @@ namespace MDR_Coder
             codeEvent!.num_publishers_to_match += pubmed_helper.store_unmatched_publisher_org_names(source_id);
             _logging_helper.LogLine("");
         }
-
-        public void UpdateStudyOrgs()
-        {
-            org_helper.update_study_organisations(_opts.RecodeAllOrgs);
-            codeEvent!.num_orgs_to_match += org_helper.store_unmatched_study_organisation_names(source_id);
-            _logging_helper.LogLine("");
-        }
-
+        
         public void UpdateStudyIdentifiers()
         {
             org_helper.update_study_identifiers(_opts.RecodeAllOrgs);
             codeEvent!.num_orgs_to_match += org_helper.store_unmatched_study_identifiers_org_names(source_id);
             _logging_helper.LogLine("");
         }
+        
+        public void UpdateStudyOrgs()
+        {
+            if (_source.has_study_organisations is true)
+            {
+                org_helper.update_study_organisations(_opts.RecodeAllOrgs);
+                codeEvent!.num_orgs_to_match += org_helper.store_unmatched_study_organisation_names(source_id);
+                _logging_helper.LogLine("");
+            }
+        }
 
         public void UpdateStudyPeople()
         {
-            org_helper.update_study_people(_opts.RecodeAllOrgs);
-            codeEvent!.num_orgs_to_match += org_helper.store_unmatched_study_people_org_names(source_id);
-            _logging_helper.LogLine("");
+            if (_source.has_study_people is true)
+            {
+                org_helper.update_study_people(_opts.RecodeAllOrgs);
+                codeEvent!.num_orgs_to_match += org_helper.store_unmatched_study_people_org_names(source_id);
+                _logging_helper.LogLine("");
+            }
         }
         
         public void UpdateDataObjectOrgs()
@@ -143,22 +149,16 @@ namespace MDR_Coder
 
         public void UpdateObjectPeople()
         {
-            if (_source.has_study_people is true)
-            {
-                org_helper.update_object_people(_opts.RecodeAllOrgs);
-                codeEvent!.num_orgs_to_match += org_helper.store_unmatched_object_people_org_names(source_id);
-                _logging_helper.LogLine("");
-            }
+            org_helper.update_object_people(_opts.RecodeAllOrgs);
+            codeEvent!.num_orgs_to_match += org_helper.store_unmatched_object_people_org_names(source_id);
+            _logging_helper.LogLine("");
         }
         
         public void UpdateObjectOrganisations()
         {
-            if (_source.has_study_organisations is true)
-            {
-                org_helper.update_object_organisations(_opts.RecodeAllOrgs);
-                codeEvent!.num_orgs_to_match += org_helper.store_unmatched_object_organisation_org_names(source_id);
-                _logging_helper.LogLine("");
-            }
+            org_helper.update_object_organisations(_opts.RecodeAllOrgs);
+            codeEvent!.num_orgs_to_match += org_helper.store_unmatched_object_organisation_org_names(source_id);
+            _logging_helper.LogLine("");
         }
         
         public void UpdateStudyCountries()

@@ -82,13 +82,13 @@ public class Coder
                 
                 cb.UpdateDataObjectOrgs();
                 cb.UpdateObjectInstanceOrgs();      
-               
-                if (source.has_object_pubmed_set is true)
-                {
-                    cb.UpdateObjectIdentifiers();
-                    cb.UpdateObjectPeople();
-                    cb.UpdateObjectOrganisations();
-                }
+            }
+            
+            if (source.has_object_pubmed_set is true)
+            {
+                cb.UpdateObjectIdentifiers();
+                cb.UpdateObjectPeople();
+                cb.UpdateObjectOrganisations();
             }
         }
         

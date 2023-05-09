@@ -350,10 +350,10 @@ public class TopicHelper
         string make_table3_sql = $@"drop table if exists {schema}.topic_ids_to_delete;
                                 create table {schema}.topic_ids_to_delete
                                 as
-                                select ax.id from {schema}.all_duplicated_topic_ids a
+                                select a.id from {schema}.all_duplicated_topic_ids a
                                 LEFT JOIN {schema}.min_duplicated_topic_ids m                                          
-                                on x.{id_field} = m.{id_field}
-                                on x.mesh_value = m.mesh_value
+                                on a.{id_field} = m.{id_field}
+                                and a.mesh_value = m.mesh_value
                                 and a.id = m.min_id
                                 where m.min_id is null; ";
         
@@ -379,11 +379,11 @@ public class TopicHelper
                     {
                         int e = r + rec_batch < max_id ? r + rec_batch : max_id;
                         _loggingHelper.LogLine($"Identifying {res_r} {feedback_core} {qualifier}, ids {r} to {e}");
-                        make_table1_sql += $" where t.id >= {r} and t.id < {e} ";
-                        ExecuteSQL(make_table1_sql);  // creates table with all topic records involved in duplicates
-                        make_table2_sql += @$" where t.id >= {r} and t.id < {e} 
+                        string make_table1 = make_table1_sql + $" where t.id >= {r} and t.id < {e} ";
+                        ExecuteSQL(make_table1);  // creates table with all topic records involved in duplicates
+                        string make_table2 = make_table2_sql + @$" where t.id >= {r} and t.id < {e} 
                                               group by t.{id_field}, t.mesh_value ";
-                        ExecuteSQL(make_table2_sql);  // creates table with min id topic records involved in duplicates
+                        ExecuteSQL(make_table2);  // creates table with min id topic records involved in duplicates
                         ExecuteSQL(make_table3_sql);  // creates the table wih the ids of the records to duplicate
                         int res_b = ExecuteSQL(delete_sql);        // Does the deletion
                         _loggingHelper.LogLine($"Deleted {res_b} {feedback_core} {qualifier}, ids {r} to {e}");
@@ -399,8 +399,8 @@ public class TopicHelper
                 {
                     _loggingHelper.LogLine($"Identifying {res} {feedback_core} {qualifier}, as a single query");
                     ExecuteSQL(make_table1_sql);  // creates table with all topic records involved in duplicates
-                    make_table2_sql += @$" group by t.{id_field}, t.mesh_value ";
-                    ExecuteSQL(make_table2_sql);  // creates table with min id topic records involved in duplicates
+                    string make_table2 = make_table2_sql + @$" group by t.{id_field}, t.mesh_value ";
+                    ExecuteSQL(make_table2);  // creates table with min id topic records involved in duplicates
                     ExecuteSQL(make_table3_sql);  // creates the table wih the ids of the records to duplicate
                     int res_a = ExecuteSQL(delete_sql);        // Does the deletion
                     _loggingHelper.LogLine($"Deleted {res_a} {feedback_core} {qualifier}, as a single query");
