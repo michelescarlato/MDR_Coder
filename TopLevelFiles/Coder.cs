@@ -59,43 +59,65 @@ public class Coder
         CodeEvent coding = cb.CreateCodingEvent(codingId);  
         cb.EstablishTempTables();
         
+        // if test data only create the test data study and object lists
+        
+        TestHelper th = new TestHelper(source, _loggingHelper);
+        if (opts.ReCodeTestDataOnly)
+        {
+            if (source.source_type == "study")
+            {
+                th.EstablishTempStudyTestList();
+            }
+            else
+            {
+                th.EstablishTempObjectTestList();
+            }
+        }
+
         // If pubmed and publisher updates requested, do these updates first.
         
-        if (opts.RecodeAllPublishers || opts.RecodeUnmatchedPublishers)
+        if (opts.RecodePublishers > 0 && source.has_object_pubmed_set is true)
         {
-            if (source.id is 100135)
-            {
-                cb.ObtainPublisherInformation();
-                cb.ApplyPublisherData();
-            }
+            cb.ObtainPublisherInformation();
+            cb.ApplyPublisherData();
         }
 
         // Update and standardise study and object organisation ids and names
         
-        if (opts.RecodeAllOrgs || opts.RecodeUnmatchedOrgs)
+        if (opts.RecodeOrgs > 0)
         {
             if (source.has_study_tables is true)
             {
                 cb.UpdateStudyIdentifiers();
-                cb.UpdateStudyOrgs();   // table existence checked later
-                cb.UpdateStudyPeople();   // table existence checked later
-                
+                if (source.has_study_people is true)
+                {
+                    cb.UpdateStudyPeople(); 
+                }
+                if (source.has_study_organisations is true)
+                {
+                    cb.UpdateStudyOrgs();
+                }
+
                 cb.UpdateDataObjectOrgs();
                 cb.UpdateObjectInstanceOrgs();      
             }
             
             if (source.has_object_pubmed_set is true)
             {
+                cb.UpdateDataObjectOrgs();
+                cb.UpdateObjectInstanceOrgs(); 
+                
                 cb.UpdateObjectIdentifiers();
                 cb.UpdateObjectPeople();
                 cb.UpdateObjectOrganisations();
             }
+            cb.DropTempOrgTables();
         }
         
         
         // Update and standardise study countries and locations.
         
-        if (opts.RecodeAllLocations || opts.RecodeUnmatchedLocations)
+        if (opts.RecodeLocations > 0)
         {
                 cb.UpdateStudyCountries();
                 cb.UpdateStudyLocations();   
@@ -103,34 +125,39 @@ public class Coder
         
         // Update and standardise topic ids and names
 
-        if (opts.RecodeAllTopics || opts.RecodeUnmatchedTopics)
+        if (opts.RecodeTopics > 0)
         {
             cb.UpdateTopics(source.source_type!);
         }
         
         // Update and standardise condition ids and names
         
-        if (opts.RecodeAllConditions || opts.RecodeUnmatchedConditions)
+        if (opts.RecodeConditions > 0)
         {
             cb.UpdateConditions();
         }
         
-        
         // Tidy up 
         
-        if (source.has_study_tables is true)
+        if (opts.ReCodeTestDataOnly)
         {
-            _monDataLayer.UpdateStudiesCodedDate(codingId, source.db_conn);
+            th.TeardownTempTestDataTables();
         }
         else
         {
-            // only do the objects table if there are no studies (e.g. PubMed).
-            
-            _monDataLayer.UpdateObjectsCodedDate(codingId, source.db_conn);
+            if (source.has_study_tables is true)
+            {
+                _monDataLayer.UpdateStudiesCodedDate(codingId, source.db_conn);
+            }
+            else
+            {
+                // only do the objects table if there are no studies (e.g. PubMed).
+
+                _monDataLayer.UpdateObjectsCodedDate(codingId, source.db_conn);
+            }
+            _monDataLayer.StoreCodingEvent(coding);
         }
-        _monDataLayer.StoreCodingEvent(coding);
-        
-        cb.DropTempTables();
+
         cb.DropContextForeignTables();
         _loggingHelper.LogLine("Foreign (mon) tables removed from database");    
     } 

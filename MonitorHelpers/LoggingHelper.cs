@@ -61,7 +61,11 @@ public class LoggingHelper : ILoggingHelper
         string feedback = dtPrefix + message + identifier;
         Transmit(feedback);
     }
-
+    
+    public void LogBlank()
+    {
+        Transmit("");
+    }
 
     public void LogHeader(string message)
     {
@@ -132,27 +136,62 @@ public class LoggingHelper : ILoggingHelper
             }
         }
 
-        if (opts.RecodeAllOrgs)
+        if (opts.RecodeOrgs > 0)
         {
-            LogLine("Recoding all organisation data, not just recently added");
+            if (opts.RecodeOrgs == 1)
+            {
+                LogLine("Recoding unmatched organisation data");
+            }
+            else if (opts.RecodeOrgs == 2)
+            {
+                LogLine("Recoding all organisation data, not just recently added");
+            }
         }
-        if (opts.RecodeAllLocations)
+        if (opts.RecodeLocations > 0)
         {
-            LogLine("Recoding all country / location data, not just recently added");
+            if (opts.RecodeLocations == 1)
+            {
+                LogLine("Recoding unmatched country / location data");
+            }
+            else if (opts.RecodeLocations == 2)
+            {
+                LogLine("Recoding all country / location data, not just recently added");
+            }
         }
-        if (opts.RecodeAllTopics)
+        if (opts.RecodeTopics > 0)
         {
-            LogLine("Recoding all topic data, not just recently added");
+            if (opts.RecodeTopics == 1)
+            {
+                LogLine("Recoding unmatched topic data");
+            }
+            else if (opts.RecodeTopics == 2)
+            {
+                LogLine("Recoding all topic data, not just recently added");
+            }
         }
-        if (opts.RecodeAllConditions)
+        if (opts.RecodeConditions > 0)
         {
-            LogLine("Recoding all condition data, not just recently added");
+            if (opts.RecodeConditions == 1)
+            {
+                LogLine("Recoding unmatched condition data");
+            }
+            else if (opts.RecodeConditions == 2)
+            {
+                LogLine("Recoding all condition data, not just recently added");
+            }
         }
-        if (opts.RecodeAllPublishers)
+        if (opts.RecodePublishers > 0)
         {
-            LogLine("Recoding all publisher data, not just recently added");
+            if (opts.RecodePublishers == 1)
+            {
+                LogLine("Recoding unmatched publisher data");
+            }
+            else if (opts.RecodePublishers == 2)
+            {
+                LogLine("Recoding all publisher data, not just recently added");
+            }
         }
-        LogLine("");
+        LogBlank();
     }
 
 
@@ -189,68 +228,5 @@ public class LoggingHelper : ILoggingHelper
         int res = conn.ExecuteScalar<int>(sqlString);
         return res.ToString() + " records found in " + schema + "." + tableName;
     }
-
-   /*
-    public void LogDiffs(Source s)
-    {
-        string dbConn = s.db_conn!;
-
-        LogLine("");
-        LogLine("SD - AD Differences");
-        LogLine("");
-        if (s.has_study_tables is true)
-        {
-            LogLine(GetTableRecordCount(dbConn, "to_ad_study_recs"));
-            LogLine(GetEntityRecDiffs(dbConn, "study"));
-            GetStudyStats(dbConn, "recs");
-            LogLine(GetTableRecordCount(dbConn, "to_ad_study_atts"));
-            GetStudyStats(dbConn, "atts");
-        }
-
-        LogLine(GetTableRecordCount(dbConn, "to_ad_object_recs"));
-        LogLine(GetEntityRecDiffs(dbConn, "object"));
-        LogLine(GetDatasetRecDiffs(dbConn));
-
-        GetObjectStats(dbConn, "recs");
-        LogLine(GetTableRecordCount(dbConn, "to_ad_object_atts"));
-        GetObjectStats(dbConn, "atts");
-    }
-
-    
-
-    private void GetAndWriteStats(string dbConn, string sqlString)
-    {
-        using NpgsqlConnection conn = new(dbConn);
-        List<att_stat> statusStats = conn.Query<att_stat>(sqlString).ToList();
-        if (statusStats.Any())
-        {
-            foreach (att_stat hs in statusStats)
-            {
-                LogLine($"Status {hs.status}: {hs.num}");
-            }
-        }
-        LogLine("");
-    }
-
-
-    private string GetEntityRecDiffs(string dbConn, string entityType)
-    {
-        string tableName = (entityType == "study") ? "sd.to_ad_study_recs" : "sd.to_ad_object_recs";
-        string sqlString = $@"select count(*) from {tableName} 
-                              where {entityType}_rec_status = 2;";
-        using NpgsqlConnection conn = new(dbConn);
-        int res = conn.ExecuteScalar<int>(sqlString);
-        return $"{res} records found with edits to the {entityType} record itself;";
-    }
-
-    private string GetDatasetRecDiffs(string dbConn)
-    {
-        string sqlString = @"select count(*) from sd.to_ad_object_recs
-                             where object_dataset_status = 4;";
-        using NpgsqlConnection conn = new(dbConn);
-        int res = conn.ExecuteScalar<int>(sqlString);
-        return $"{res} records found with edits to the dataset data;";
-    }
-
-   */
+  
 }

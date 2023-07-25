@@ -3,7 +3,7 @@
   "profiles": {
     "MDR_Coder": {
       "commandName": "Project",
-      "commandLineArgs": "-s \"100135\" -G",
+      "commandLineArgs": "-s \"101901\" -M",
       "environmentVariables": {
       }
     }

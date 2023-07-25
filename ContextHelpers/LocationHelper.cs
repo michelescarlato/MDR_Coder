@@ -6,14 +6,22 @@ namespace MDR_Coder
     public class LocHelper
     {
         private readonly string _db_conn;
-        private readonly string _schema;
         private readonly ILoggingHelper _loggingHelper;     
-
-        public LocHelper(Source source, ILoggingHelper logger)
+        private readonly string scope_qualifier;
+        private readonly string feedback_qualifier;
+        
+        public LocHelper(Source source, ILoggingHelper logger, int scope, bool recodeTestDataOnly)
         {
             _db_conn = source.db_conn ?? "";
-            _schema = "ad"; 
             _loggingHelper = logger;
+            scope_qualifier = scope == 1 ? " and c.coded_on is null " : ""; 
+            feedback_qualifier = scope == 1 ? "unmatched" : "all";
+            if (recodeTestDataOnly)
+            {
+                // test data 'trumps' the decisions above 
+                scope_qualifier = " and c.sd_sid in (select sd_sid from mn.test_study_list) ";
+                feedback_qualifier = "test data";
+            }
         }
 
         public int Execute_SQL(string sql_string)
@@ -87,15 +95,15 @@ namespace MDR_Coder
         
         public void establish_temp_tables()
         {
-            string sql_string = $@"drop table if exists {_schema}.temp_country_names;
-                 create table {_schema}.temp_country_names 
+            string sql_string = $@"drop table if exists ad.temp_country_names;
+                 create table ad.temp_country_names 
                  as 
                  select a.geoname_id, country_name, lower(a.alt_name) as name from 
                  context_ctx.country_names a";
             Execute_SQL(sql_string);
             
-            sql_string = $@"drop table if exists {_schema}.temp_city_names;
-                 create table {_schema}.temp_city_names 
+            sql_string = $@"drop table if exists ad.temp_city_names;
+                 create table ad.temp_city_names 
                  as 
                  select a.geoname_id, city_name, 
                     lower(a.alt_name) as name,
@@ -107,30 +115,26 @@ namespace MDR_Coder
         
         // Code country names
         
-        public void update_study_countries(bool code_all)
+        public void update_study_countries()
         {
-            int min_id = GetMinId(_schema, "study_countries");
-            int max_id = GetMaxId(_schema, "study_countries");
-            string qualifier = code_all ? "all" : "unmatched"; 
+            int min_id = GetMinId("ad","study_countries");
+            int max_id = GetMaxId("ad", "study_countries");
             
-            string sql_string = $@"update {_schema}.study_countries c
+            string sql_string = $@"update ad.study_countries c
             set country_id = n.geoname_id
-            from {_schema}.temp_country_names n
+            from ad.temp_country_names n
             where c.country_name is not null
-            and lower(c.country_name) = n.name ";
-            sql_string += code_all ? "" : " and coded_on is null ";
-
-            string action = $"Coding {qualifier} country names";
+            and lower(c.country_name) = n.name {scope_qualifier}";
+            
+            string action = $"Coding {feedback_qualifier} country names";
             Execute_LocationSQL(min_id, max_id, 200000, sql_string, action);
             
-            sql_string = $@"update {_schema}.study_countries c
+            sql_string = $@"update ad.study_countries c
                         set country_name = n.country_name, 
                         coded_on = CURRENT_TIMESTAMP
-                        from {_schema}.temp_country_names n 
-                        where c.country_id = n.geoname_id ";
-            sql_string += code_all ? "" : " and coded_on is null ";
-            
-            action = $"Inserting default country names for {qualifier} countries";
+                        from ad.temp_country_names n 
+                        where c.country_id = n.geoname_id {scope_qualifier}";
+            action = $"Inserting default country names for {feedback_qualifier} countries";
             Execute_LocationSQL(min_id, max_id, 200000, sql_string, action);
 
             FeedbackCountryResults("ad", "study_countries");
@@ -139,91 +143,76 @@ namespace MDR_Coder
         
         // Code location city and country codes
         
-        public void update_studylocation_orgs(bool code_all)
+        public void update_studylocation_orgs()
         {
-            int min_id = GetMinId(_schema, "study_locations");
-            int max_id = GetMaxId(_schema, "study_locations");
-            string qualifier = code_all ? "all" : "unmatched"; 
+            int min_id = GetMinId("ad", "study_locations");
+            int max_id = GetMaxId("ad", "study_locations");
             
-            RemoveInitialThes(_schema + ".study_locations", "facility", min_id, max_id, 200000);
+            RemoveInitialThes("ad.study_locations", "facility", min_id, max_id, 200000);
             
-            string sql_string = $@"update {_schema}.study_locations c
-            set facility_org_id = n.org_id
-            from {_schema}.temp_org_names n
-            where c.facility is not null
-            and lower(c.facility) = n.name ";
-            sql_string += code_all ? "" : " and coded_on is null ";
-            
-            string action = $"Coding {qualifier} facility names";
+            string sql_string = $@"update ad.study_locations c
+                        set facility_org_id = n.org_id
+                        from ad.temp_org_names n
+                        where c.facility is not null
+                        and lower(c.facility) = n.name {scope_qualifier}";
+            string action = $"Coding {feedback_qualifier} facility names";
             Execute_LocationSQL(min_id, max_id, 100000, sql_string, action);
             
-            sql_string = $@"update {_schema}.study_locations c
-            set facility = g.default_name,
-            facility_ror_id = g.ror_id
-            from context_ctx.organisations g
-            where c.facility_org_id = g.id ";
-            sql_string += code_all ? "" : " and coded_on is null ";
-            
-            action = $"Inserting default facility names for {qualifier} facilities";
+            sql_string = $@"update ad.study_locations c
+                        set facility = g.default_name,
+                        facility_ror_id = g.ror_id
+                        from context_ctx.organisations g
+                        where c.facility_org_id = g.id {scope_qualifier}";
+            action = $"Inserting default facility names for {feedback_qualifier} facilities";
             Execute_LocationSQL(min_id, max_id, 100000, sql_string, action);
             
-            sql_string = $@"update {_schema}.study_locations c
-            set city_id = locs.city_id,
-            city_name = locs.city,
-            country_id = locs.country_id,
-            country_name = locs.country,
-            coded_on = CURRENT_TIMESTAMP
-            from context_ctx.org_locations locs
-            where c.facility_org_id = locs.org_id ";
-            sql_string += code_all ? "" : " and coded_on is null ";
-            
-            action = $"Added location city and country default names for {qualifier} facilities";
+            sql_string = $@"update ad.study_locations c
+                        set city_id = locs.city_id,
+                        city_name = locs.city,
+                        country_id = locs.country_id,
+                        country_name = locs.country,
+                        coded_on = CURRENT_TIMESTAMP
+                        from context_ctx.org_locations locs
+                        where c.facility_org_id = locs.org_id {scope_qualifier}";
+            action = $"Added location city and country default names for {feedback_qualifier} facilities";
             Execute_LocationSQL(min_id, max_id, 100000, sql_string, action);
             
             // Now considering cities that have not been coded. try to code them
             // An element of ambiguity here, so use the country as well.
             // Still not perfect but better than nothing...
             
-            sql_string = $@"update {_schema}.study_locations c
-            set city_id = n.geoname_id
-            from {_schema}.temp_city_names n
-            where c.city_name is not null
-            and lower(c.city_name) = n.name 
-            and lower(c.country_name) = n.country_name ";
-            sql_string += code_all ? "" : " and coded_on is null ";
-            
-            action = $"Coding {qualifier} city names, not coded using facility data";
+            sql_string = $@"update ad.study_locations c
+                        set city_id = n.geoname_id
+                        from ad.temp_city_names n
+                        where c.city_name is not null
+                        and lower(c.city_name) = n.name 
+                        and lower(c.country_name) = n.country_name {scope_qualifier}";
+            action = $"Coding {feedback_qualifier} city names, not coded using facility data";
             Execute_LocationSQL(min_id, max_id, 100000, sql_string, action);
 
-            sql_string = $@"update {_schema}.study_locations c
+            sql_string = $@"update ad.study_locations c
                         set city_name = n.city_name
-                        from {_schema}.temp_city_names n 
-                        where c.city_id = n.geoname_id ";
-            sql_string += code_all ? "" : " and coded_on is null ";
-            
-            action = $"Inserting default names for {qualifier} cities not coded using facility data";
+                        from ad.temp_city_names n 
+                        where c.city_id = n.geoname_id {scope_qualifier}";
+            action = $"Inserting default names for {feedback_qualifier} cities not coded using facility data";
             Execute_LocationSQL(min_id, max_id, 100000, sql_string, action);
             
             // Finally consider countries that have not been coded.
 
-            sql_string = $@"update {_schema}.study_locations c
-                set country_id = n.geoname_id
-                from {_schema}.temp_country_names n
-                where c.country_name is not null
-                and lower(c.country_name) = n.name ";
-            sql_string += code_all ? "" : " and coded_on is null ";
-            
-            action = $"Coding {qualifier} country names, not coded using facility data";
+            sql_string = $@"update ad.study_locations c
+                        set country_id = n.geoname_id
+                        from ad.temp_country_names n
+                        where c.country_name is not null
+                        and lower(c.country_name) = n.name {scope_qualifier}";
+            action = $"Coding {feedback_qualifier} country names, not coded using facility data";
             Execute_LocationSQL(min_id, max_id, 100000, sql_string, action);
             
-            sql_string = $@"update {_schema}.study_locations c
+            sql_string = $@"update ad.study_locations c
                         set country_name = n.country_name,
                         coded_on = CURRENT_TIMESTAMP
-                        from {_schema}.temp_country_names n 
-                        where c.country_id = n.geoname_id ";
-            sql_string += code_all ? "" : " and coded_on is null ";
-            
-            action = $"Inserting default names for {qualifier} countries not coded using facility data";
+                        from ad.temp_country_names n 
+                        where c.country_id = n.geoname_id {scope_qualifier}";
+            action = $"Inserting default names for {feedback_qualifier} countries not coded using facility data";
             Execute_LocationSQL(min_id, max_id, 100000, sql_string, action);
             FeedbackLocationResults("ad", "study_locations");
         }
@@ -296,13 +285,13 @@ namespace MDR_Coder
         private int StoreUncodedCities(int rec_batch, int source_id)
         {
             string action = $"Storing uncoded city names from study_locations";
-            int min_id = GetMinId(_schema, "study_locations");
-            int max_id = GetMaxId(_schema, "study_locations");
+            int min_id = GetMinId("ad", "study_locations");
+            int max_id = GetMaxId("ad", "study_locations");
             int number_of_loops = 0;
             string base_sql = $@"insert into context_ctx.to_match_cities 
                                  (source_id, source_table, city_name, number_of) 
                                  select {source_id}, 'study_locations', city_name, count(city_name) 
-                                 from {_schema}.study_locations c
+                                 from ad.study_locations c
                                  where city_id is null ";
             try
             {
@@ -342,7 +331,7 @@ namespace MDR_Coder
             // Create a temp table with the aggregated data, delete the 
             // existing data, and replace with the aggregated set
             
-            string sql_string = $@"create table {_schema}.temp_city_data as
+            string sql_string = $@"create table ad.temp_city_data as
                             select source_id, city_name, 
                             sum(number_of) as number_of
                             from context_ctx.to_match_cities 
@@ -358,10 +347,10 @@ namespace MDR_Coder
            sql_string = $@"insert into context_ctx.to_match_cities 
                            (source_id, source_table, city_name, number_of) 
                            select source_id, 'study_locations', city_name, number_of
-                           from {_schema}.temp_city_data ;";
+                           from ad.temp_city_data ;";
            Execute_SQL(sql_string);
 
-           sql_string = $@"drop table {_schema}.temp_city_data ";
+           sql_string = $@"drop table ad.temp_city_data ";
            Execute_SQL(sql_string);
         }
 
@@ -376,7 +365,7 @@ namespace MDR_Coder
             Execute_SQL(sql_string); 
             sql_string = $@"insert into context_ctx.to_match_countries (source_id, source_table, country_name, number_of) 
             select {source_id}, 'study_countries', country_name, count(country_name) 
-            from {_schema}.study_countries 
+            from ad.study_countries 
             where country_id is null 
             group by country_name; ";
 
@@ -394,7 +383,7 @@ namespace MDR_Coder
             Execute_SQL(sql_string); 
             sql_string = $@"insert into context_ctx.to_match_countries (source_id, source_table, country_name, number_of) 
             select {source_id}, 'study_locations', country_name, count(country_name) 
-            from {_schema}.study_locations 
+            from ad.study_locations 
             where country_id is null 
             group by country_name; ";
 
@@ -432,8 +421,8 @@ namespace MDR_Coder
         
         public void delete_temp_tables()
         {
-            string sql_string = $@"drop table {_schema}.temp_country_names;
-                                   drop table {_schema}.temp_city_names ";
+            string sql_string = $@"drop table ad.temp_country_names;
+                                   drop table ad.temp_city_names ";
 
             Execute_SQL(sql_string);
         }

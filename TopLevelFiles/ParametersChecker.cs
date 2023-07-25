@@ -52,25 +52,43 @@ internal class ParameterChecker
                 }
             }
 
-            if (opts.RecodeAll)    // recode ALL options force the recoding of all data, even if already coded
+            opts.RecodeAll ??= 0;
+            opts.RecodeOrgs ??= 0;
+            opts.RecodeConditions ??= 0;
+            opts.RecodeTopics ??= 0;
+            opts.RecodeLocations ??= 0;
+            opts.RecodePublishers ??= 0;
+            
+            if (opts.RecodeAll == 1)   
             {
-                opts.RecodeAllOrgs = true;
-                opts.RecodeAllConditions = true;
-                opts.RecodeAllTopics = true;
-                opts.RecodeAllLocations = true;
-                opts.RecodeAllPublishers = true;
+                opts.RecodeOrgs = 1;
+                opts.RecodeConditions = 1;
+                opts.RecodeTopics = 1;
+                opts.RecodeLocations = 1;
+                opts.RecodePublishers = 1;
             }
             
-            if (opts.RecodeUnmatchedAll)    // recode ALL options force the recoding of all data, even if already coded
+            if (opts.ReCodeTestDataOnly)
             {
-                opts.RecodeUnmatchedOrgs = true;
-                opts.RecodeUnmatchedConditions = true;
-                opts.RecodeUnmatchedTopics = true;
-                opts.RecodeUnmatchedLocations = true;
-                opts.RecodeUnmatchedPublishers = true;
+                opts.RecodeAll = 2;
             }
             
-            // parameters valid - return opts.
+            if (opts.RecodeAll == 2)    
+            {
+                opts.RecodeOrgs = 2;
+                opts.RecodeConditions = 2;
+                opts.RecodeTopics = 2;
+                opts.RecodeLocations = 2;
+                opts.RecodePublishers = 2;
+            }
+            
+            if (opts.RecodeOrgs > 2) opts.RecodeOrgs = 2;
+            if (opts.RecodeConditions > 2) opts.RecodeConditions = 2;
+            if (opts.RecodeTopics > 2) opts.RecodeTopics = 2;
+            if (opts.RecodeLocations > 2) opts.RecodeLocations = 2;
+            if (opts.RecodePublishers > 2) opts.RecodePublishers = 2;
+            
+            // parameters valid - return opts, now with valid non null values
 
             return new ParamsCheckResult(false, false, opts);
         }
@@ -125,41 +143,27 @@ public class Options
     [Option('s', "source_ids", Required = false, Separator = ',', HelpText = "Comma separated list of Integer ids of data sources.")]
     public IEnumerable<int>? SourceIds { get; set; }
     
-    [Option('a', "code unmatched", Required = false, HelpText = "If present, forces the coding of all of the unmatched codable data")]
-    public bool RecodeUnmatchedAll { get; set; }
+    [Option('a', "code all data types", Required = false, HelpText = "If present, causes coding of unmatched (=1) or all (=2) types of codable data")]
+    public int? RecodeAll { get; set; }
+
+    [Option('g', "code orgs", Required = false,
+        HelpText = "If present, forces the (re)coding of of unmatched (=1) or all (=2) organisational data")]
+    public int? RecodeOrgs { get; set; }
     
-    [Option('g', "code unmatched orgs", Required = false, HelpText = "If present, forces the (re)coding of all of the codable ad organisational data")]
-    public bool RecodeUnmatchedOrgs { get; set; }
+    [Option('l', "code locations", Required = false, HelpText = "If present, forces the (re)coding of of unmatched (=1) or all (=2) country and location data data")]
+    public int? RecodeLocations { get; set; }
     
-    [Option('l', "code unmatched locations", Required = false, HelpText = "If present, forces the (re)coding of all of the codable ad country and location data data")]
-    public bool RecodeUnmatchedLocations { get; set; }
+    [Option('t', "code topics", Required = false, HelpText = "If present, forces the (re)coding of of unmatched (=1) or all (=2) topic data")]
+    public int? RecodeTopics { get; set; }
     
-    [Option('t', "code unmatched topics", Required = false, HelpText = "If present, forces the (re)coding of all of the codable ad topic data")]
-    public bool RecodeUnmatchedTopics { get; set; }
+    [Option('c', "code conditions", Required = false, HelpText = "If present, forces the (re)coding of of unmatched (=1) or all (=2) conditions data")]
+    public int? RecodeConditions { get; set; }
     
-    [Option('c', "code unmatched conditions", Required = false, HelpText = "If present, forces the (re)coding of all of the codable ad conditions data")]
-    public bool RecodeUnmatchedConditions { get; set; }
+    [Option('p', "code publishers", Required = false, HelpText = "If present, forces the (re)coding of of unmatched (=1) or all (=2) publisher data")]
+    public int? RecodePublishers { get; set; }
     
-    [Option('p', "code unmatched publishers", Required = false, HelpText = "If present, forces the (re)coding of all of the codable ad publisher data")]
-    public bool RecodeUnmatchedPublishers { get; set; }
-    
-    [Option('A', "code ALL", Required = false, HelpText = "If present, forces the (re)coding of all of the codable data")]
-    public bool RecodeAll { get; set; }
-    
-    [Option('G', "code ALL orgs", Required = false, HelpText = "If present, forces the (re)coding of all of the codable ad organisational data")]
-    public bool RecodeAllOrgs { get; set; }
-    
-    [Option('L', "code ALL locations", Required = false, HelpText = "If present, forces the (re)coding of all of the codable ad country and location data data")]
-    public bool RecodeAllLocations { get; set; }
-    
-    [Option('T', "code ALL topics", Required = false, HelpText = "If present, forces the (re)coding of all of the codable ad topic data")]
-    public bool RecodeAllTopics { get; set; }
-    
-    [Option('C', "code ALL conditions", Required = false, HelpText = "If present, forces the (re)coding of all of the codable ad conditions data")]
-    public bool RecodeAllConditions { get; set; }
-    
-    [Option('P', "code ALL publishers", Required = false, HelpText = "If present, forces the (re)coding of all of the codable ad publisher data")]
-    public bool RecodeAllPublishers { get; set; }
+    [Option('M', "code test data only", Required = false, HelpText = "Only test data is recoded")]
+    public bool ReCodeTestDataOnly { get; set; }
 }
 
 

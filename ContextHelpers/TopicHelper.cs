@@ -6,14 +6,22 @@ namespace MDR_Coder;
 public class TopicHelper
 {
     private readonly string _db_conn;
-    private readonly string _source_type;
-    private readonly ILoggingHelper _loggingHelper;        
+    private readonly ILoggingHelper _loggingHelper;
+    private readonly bool _recodeTestDataOnly;
+    private readonly string topic_table;
+    private readonly string topic_type;
+    private string scope_qualifier;
+    private string fb_qualifier;
 
-    public TopicHelper(Source source, ILoggingHelper logger)
+    public TopicHelper(Source source, ILoggingHelper logger, int scope, bool recodeTestDataOnly)
     {
         _db_conn = source.db_conn ?? "";
-        _source_type = source.source_type ?? "";
+        topic_table = source.source_type!.ToLower() == "study" ? "study_topics" : "object_topics";
+        topic_type = source.source_type!.ToLower();
         _loggingHelper = logger;
+        _recodeTestDataOnly = recodeTestDataOnly;
+        scope_qualifier = scope == 1 ? " and t.coded_on is null " : "";
+        fb_qualifier = scope == 1 ? "unmatched" : "all";
     }
 
     public int ExecuteSQL(string sql_string)
@@ -66,134 +74,127 @@ public class TopicHelper
                                $"have MESH coded topics in {schema}.{table_name}");
     }
 
-    public void process_topics(bool code_all)
+    public void process_topics()
     {
-        // The presence of a study_topics table has already been checked
-
-        string schema = "ad";
-        string topic_table = _source_type.ToLower() == "study" ? "study_topics" : "object_topics";
-        
-        if (!code_all) // keep a record of topic record ids not yet coded
-        {
-            // Keep a temp table record of topic record ids that are not yet coded.  
-            // Necessary to help with de-duplication process after coding has completed.
-
-            string sql_string = $@"drop table if exists ad.uncoded_topic_records;          
-                create table ad.uncoded_topic_records as                    
-                select id from ad.{topic_table} where coded_on is null; ";
-            using var conn = new NpgsqlConnection(_db_conn);
-            conn.Execute(sql_string);
-        }
-        
-        int min_id = GetMinId(schema, topic_table);
-        int max_id = GetMaxId(schema, topic_table);
-        delete_no_information_cats(topic_table, schema, min_id, max_id, 200000, code_all);
-        identify_geographic(topic_table, schema, min_id, max_id, 200000, code_all);
-        mesh_match_topics(topic_table, schema, min_id, max_id, 200000, code_all);
-        mesh_delete_duplicates(topic_table, schema, min_id, max_id, 50000, code_all);
-        FeedbackTopicResults(schema, topic_table, "mesh_code");
+        int min_id = GetMinId("ad", topic_table);
+        int max_id = GetMaxId("ad", topic_table);
+        delete_no_information_categories(min_id, max_id, 100000);
+        identify_conditions(min_id, max_id, 100000);        
+        identify_geographic(min_id, max_id, 100000);
+        match_to_mesh_topics(min_id, max_id, 100000);
+        FeedbackTopicResults("ad",topic_table, "mesh_code");
     }
 
     
-    public void delete_no_information_cats(string topic_table, string schema, 
-                                           int min_id, int max_id, int rec_batch, bool code_all)
+    private void delete_no_information_categories(int min_id, int max_id, int rec_batch)
     {
-        string top_string = $"delete from {schema}.{topic_table}";
+        string top_string = $"delete from ad.{topic_table} t";
         
-        string sql_string = top_string + @" where (lower(original_value) = '' 
+        if (_recodeTestDataOnly)    // test data 'trumps' the decisions above 
+        {
+            scope_qualifier = topic_type == "study" 
+                        ? " and t.sd_sid in (select sd_sid from mn.test_study_list) "
+                        : " and t.sd_oid in (select sd_oid from mn.test_object_list) ";
+            fb_qualifier = "test data";
+        }
+        
+        string sql_string = top_string + $@" where (lower(original_value) = '' 
                         or lower(original_value) = 'human'
                         or lower(original_value) = 'humans'
                         or lower(original_value) = 'other'
                         or lower(original_value) = 'studies'
                         or lower(original_value) = 'evaluation'    
-                        or lower(original_value) = 'n/a') ";
-        delete_topics(topic_table, sql_string, "A", min_id, max_id, rec_batch, code_all);
+                        or lower(original_value) = 'n/a') 
+                        {scope_qualifier}";
+        delete_topics(sql_string, "A", min_id, max_id, rec_batch);
 
-        sql_string = top_string + @" where (lower(original_value) = 'healthy adults' 
+        sql_string = top_string + $@" where (lower(original_value) = 'healthy adults' 
                         or lower(original_value) = 'healthy adult'
                         or lower(original_value) = 'healthy person'
                         or lower(original_value) = 'healthy people'
                         or lower(original_value) = 'female'
                         or lower(original_value) = 'male'
                         or lower(original_value) = 'healthy adult female'
-                        or lower(original_value) = 'healthy adult male') ";
-        delete_topics(topic_table, sql_string, "B", min_id, max_id, rec_batch, code_all);
+                        or lower(original_value) = 'healthy adult male') 
+                        {scope_qualifier}";
+        delete_topics(sql_string, "B", min_id, max_id, rec_batch);
 
-        sql_string = top_string + @" where (lower(original_value) = 'hv' 
+        sql_string = top_string + $@" where (lower(original_value) = 'hv' 
                         or lower(original_value) = 'healthy volunteer'
                         or lower(original_value) = 'healthy volunteers'
                         or lower(original_value) = 'volunteer'
                         or lower(original_value) = 'healthy control'
-                        or lower(original_value) = 'normal control') ";
-        delete_topics(topic_table, sql_string, "C", min_id, max_id, rec_batch, code_all);
+                        or lower(original_value) = 'normal control') 
+                        {scope_qualifier}";
+        delete_topics(sql_string, "C", min_id, max_id, rec_batch);
 
-        sql_string = top_string + @" where (lower(original_value) = 'healthy individual' 
+        sql_string = top_string + $@" where (lower(original_value) = 'healthy individual' 
                         or lower(original_value) = 'healthy individuals'
                         or lower(original_value) = 'n/a(healthy adults)'
                         or lower(original_value) = 'n/a (healthy adults)'
                         or lower(original_value) = 'none (healthy adults)'
                         or lower(original_value) = 'healthy older adults'
-                        or lower(original_value) = 'healthy japanese subjects') ";
-        delete_topics(topic_table, sql_string, "D", min_id, max_id, rec_batch, code_all);
+                        or lower(original_value) = 'healthy japanese subjects') 
+                        {scope_qualifier}";
+        delete_topics(sql_string, "D", min_id, max_id, rec_batch);
 
-        sql_string = top_string + @" where (lower(original_value) = 'intervention' 
+        sql_string = top_string + $@" where (lower(original_value) = 'intervention' 
                         or lower(original_value) = 'implementation'
                         or lower(original_value) = 'prediction'
                         or lower(original_value) = 'recovery'
                         or lower(original_value) = 'healthy'
-                        or lower(original_value) = 'complications') ";
-        delete_topics(topic_table, sql_string, "E", min_id, max_id, rec_batch, code_all);
+                        or lower(original_value) = 'complications') 
+                        {scope_qualifier}";
+        delete_topics(sql_string, "E", min_id, max_id, rec_batch);
 
-        sql_string = top_string + @" where (lower(original_value) = 'process evaluation' 
+        sql_string = top_string + $@" where (lower(original_value) = 'process evaluation' 
                         or lower(original_value) = 'follow-up'
                         or lower(original_value) = 'validation'
                         or lower(original_value) = 'tolerability'
                         or lower(original_value) = 'training'
-                        or lower(original_value) = 'refractory') ";
-        delete_topics(topic_table, sql_string, "F", min_id, max_id, rec_batch, code_all);
+                        or lower(original_value) = 'refractory') 
+                        {scope_qualifier}";
+        delete_topics(sql_string, "F", min_id, max_id, rec_batch);
 
-        sql_string = top_string + @" where (lower(original_value) = 'symptoms' 
+        sql_string = top_string + $@" where (lower(original_value) = 'symptoms' 
                         or lower(original_value) = 'clinical research/ practice'
                         or lower(original_value) = 'predictors'
                         or lower(original_value) = 'management'
                         or lower(original_value) = 'disease'
-                        or lower(original_value) = 'relapsed') ";
-        delete_topics(topic_table, sql_string, "G", min_id, max_id, rec_batch, code_all);
+                        or lower(original_value) = 'relapsed') 
+                        {scope_qualifier}";
+        delete_topics(sql_string, "G", min_id, max_id, rec_batch);
 
-        sql_string = top_string + @" where (lower(original_value) = 'complication' 
+        sql_string = top_string + $@" where (lower(original_value) = 'complication' 
                         or lower(original_value) = '-'
                         or lower(original_value) = 'prep'
                         or lower(original_value) = 'not applicable'
                         or lower(original_value) = 'function'
                         or lower(original_value) = 'toxicity' 
-                        or lower(original_value) = 'health condition 1: o- medical and surgical') ";
-        delete_topics(topic_table, sql_string, "H", min_id, max_id, rec_batch, code_all);
+                        or lower(original_value) = 'health condition 1: o- medical and surgical') 
+                        {scope_qualifier}";
+        delete_topics(sql_string, "H", min_id, max_id, rec_batch);
     }
 
 
-    public void delete_topics(string topic_table, string sql_string, string delete_set, 
-                              int min_id, int max_id, int rec_batch, bool code_all)
+    private void delete_topics(string sql_string, string delete_set, 
+                              int min_id, int max_id, int rec_batch)
     {
         // Normally only applies to newly added topic records or records that have not been coded in the past
         // (coded_on = null). Previous topic records will already have been filtered by this process.
-        
-        sql_string += code_all ? "" : " and coded_on is null ";
-        
-        string table = topic_table == "study_topics" ? "study": "object";
-        string feedback_core = $"'no information' {table} topics (group {delete_set}) -";
-        string qualifier = code_all ? "in all topics" : "in uncoded topics"; 
+        string feedback_core = $"'no information' {topic_type} topics (group {delete_set}) -";
         try
         {
             if (max_id - min_id > rec_batch)
             {
                 for (int r = min_id; r <= max_id; r += rec_batch)
                 {
-                    string batch_sql_string = sql_string + " and id >= " + r + " and id < " + (r + rec_batch);
+                    string batch_sql_string = sql_string + " and t.id >= " + r + " and t.id < " + (r + rec_batch);
                     int res_r = ExecuteSQL(batch_sql_string);
                     if (res_r > 0)
                     {
                         int e =  r + rec_batch < max_id ? r + rec_batch : max_id;
-                        _loggingHelper.LogLine($"Deleting {res_r} {feedback_core} {qualifier}, ids {r} to {e}");
+                        _loggingHelper.LogLine($"Deleting {res_r} {feedback_core} in {fb_qualifier} topics, ids {r} to {e}");
                     }
                 }
             }
@@ -202,7 +203,7 @@ public class TopicHelper
                 int res =  ExecuteSQL(sql_string);
                 if (res > 0)
                 {
-                    _loggingHelper.LogLine($"Deleting {res} {feedback_core} {qualifier}, as a single query");
+                    _loggingHelper.LogLine($"Deleting {res} {feedback_core} in {fb_qualifier} topics, as a single query");
                 }
             }
         }
@@ -213,22 +214,145 @@ public class TopicHelper
         }
     }
 
+    private void identify_conditions(int min_id, int max_id, int rec_batch)
+    {
+        // Normally only applies to newly added topic records or records that have not been coded in the past.
+        // Previous topic records should have already have been filtered by this process.
+        
+        if (_recodeTestDataOnly)    // test data 'trumps' the decisions above 
+        {
+            scope_qualifier = topic_type == "study" 
+                ? " and t.sd_sid in (select sd_sid from mn.test_study_list) "
+                : " and t.sd_oid in (select sd_oid from mn.test_object_list) ";
+            fb_qualifier = "test data";
+        }
+        
+        // Initially identify the icd-codable topics
+        string sql_string = @"DROP TABLE IF EXISTS ad.temp_condition_topic_ids;
+                            CREATE TABLE ad.temp_condition_topic_ids 
+                            (
+                               id int, sd_sid varchar, original_value varchar, ct_id int, ct_code varchar,
+                               icd_code varchar, icd_term varchar
+                            );";
+        ExecuteSQL(sql_string);
+        
+        try
+        {
+            if (max_id - min_id > rec_batch)
+            {
+                for (int r = min_id; r <= max_id; r += rec_batch)
+                {
+                    // create a list of relevant topic records, add them to the conditions table, 
+                    // remove them from the topics table   
+                    
+                    identify_conditions(r, rec_batch, max_id, scope_qualifier, fb_qualifier);
+                    add_new_conditions(fb_qualifier);
+                    delete_condition_topics(r, rec_batch, max_id, fb_qualifier);;
+                }
+            }
+            else
+            {
+                // create a list of relevant topic records, add them to the conditions table, 
+                // remove them from the topics table   
+                    
+                identify_conditions(0, 0, 0, scope_qualifier, fb_qualifier);
+                add_new_conditions(fb_qualifier);
+                delete_condition_topics(0, 0, 0, fb_qualifier);
+            }
 
-    public void identify_geographic(string topic_table, string schema, int min_id, int max_id, 
-                                    int rec_batch, bool code_all)
+            sql_string = @"DROP TABLE IF EXISTS ad.temp_condition_topic_ids;";
+            ExecuteSQL(sql_string);
+        }
+        
+        catch (Exception e)
+        {
+            string eres = e.Message;
+            _loggingHelper.LogError("In transferring condition topics: " + eres);
+        }
+    }
+
+    private void identify_conditions(int r, int rec_batch, int max_id, string scope, string fb_qual)
+    {
+        string batch_sql_string = rec_batch > 0 ? " and t.id >= " + r + " and t.id < " + (r + rec_batch) : "";
+        const string feedback_core = "condition term";
+        
+        string sql_string = $@"TRUNCATE TABLE ad.temp_condition_topic_ids;
+                            INSERT INTO ad.temp_condition_topic_ids(id, sd_sid, original_value, ct_id, ct_code, icd_code, icd_term)
+                            SELECT t.id, t.sd_sid, t.original_value, t.original_ct_type_id, t.original_ct_code, m.icd_code, m.icd_term
+                            from ad.study_topics t inner join
+                            context_ctx.icd_terms_lookup m
+                            on lower(t.original_value) = lower(m.entry_term)
+                            {batch_sql_string} {scope}";
+        int res = ExecuteSQL(sql_string);
+        if (res > 0)
+        {
+            if (rec_batch > 0)
+            {
+                int e = r + rec_batch < max_id ? r + rec_batch : max_id;
+                _loggingHelper.LogLine($"Identifying {res} {feedback_core} in {fb_qual} topics, in ids {r} to {e}");
+            }
+            else
+            {
+                _loggingHelper.LogLine($"Identifying {res} {feedback_core} in {fb_qual} topics, as a single query");
+            }
+        }
+    }
+    
+    private void add_new_conditions(string fb_qual)
+    {
+        const string feedback_core = "condition term records";
+        string sql_string = $@"INSERT INTO ad.study_conditions(sd_sid, original_value, original_ct_type_id, original_ct_code, icd_code, 
+                            icd_name, coded_on)
+                            SELECT sd_sid, original_value, ct_id, ct_code, icd_code, icd_term, now()
+                            from ad.temp_condition_topic_ids ";
+        int res = ExecuteSQL(sql_string);
+        _loggingHelper.LogLine($"Adding {res} {feedback_core} from {fb_qual} topics, as a single query");
+    }
+    
+    
+    private void delete_condition_topics(int r, int rec_batch, int max_id, string fb_qual)
+    {
+        string batch_sql_string = rec_batch > 0 ? " and t.id >= " + r + " and t.id < " + (r + rec_batch) : "";
+        const string feedback_core = "condition topic records";
+        
+        string sql_string = $@"DELETE from ad.study_topics t
+                            USING ad.temp_condition_topic_ids tc
+                            where t.id = tc.id {batch_sql_string}";
+        int res = ExecuteSQL(sql_string);
+        if (res > 0)
+        {
+            if (rec_batch > 0)
+            {
+                int e = r + rec_batch < max_id ? r + rec_batch : max_id;
+                _loggingHelper.LogLine($"Deleting {res} {feedback_core} from {fb_qual} topics, in ids {r} to {e}");
+            }
+            else
+            {
+                _loggingHelper.LogLine($"Deleting {res} {feedback_core} from {fb_qual} topics, as a single query");
+            }
+        }
+    }
+    
+    private void identify_geographic(int min_id, int max_id, int rec_batch)
     {
         // Normally only applies to newly added topic records or records that have not been coded in the past.
         // Previous topic records will already have been filtered by this process.
         
-        string sql_string = $@"update {schema}.{topic_table} t 
+        if (_recodeTestDataOnly)    // test data 'trumps' the decisions above 
+        {
+            scope_qualifier = topic_type == "study" 
+                ? " and t.sd_sid in (select sd_sid from mn.test_study_list) "
+                : " and t.sd_oid in (select sd_oid from mn.test_object_list) ";
+            fb_qualifier = "test data";
+        }
+        
+        string sql_string = $@"update ad.{topic_table} t 
                                set topic_type_id = 16
                                from context_ctx.country_names g
-                               where t.original_value = g.alt_name ";
-        sql_string += code_all ? "" : " and coded_on is null "; 
+                               where t.original_value = g.alt_name 
+                               {scope_qualifier}";
         
-        string table = topic_table == "study_topics" ? "study": "object";
-        string feedback_core = $"geographic {table} topics -";
-        string qualifier = code_all ? "for all topics" : "for uncoded topics"; 
+        string feedback_core = $"geographic {topic_type} topics -";
         try
         {
             if (max_id - min_id > rec_batch)
@@ -240,14 +364,14 @@ public class TopicHelper
                     if (res_r > 0)
                     {
                         int e = r + rec_batch < max_id ? r + rec_batch : max_id;
-                        _loggingHelper.LogLine($"Identifying {res_r} {feedback_core} {qualifier} in ids {r} to {e}");
+                        _loggingHelper.LogLine($"Identifying {res_r} {feedback_core} in {fb_qualifier} topics, in ids {r} to {e}");
                     }
                 }
             }
             else
             {
                 int res = ExecuteSQL(sql_string);
-                _loggingHelper.LogLine($"Identifying {res} {feedback_core} {qualifier} as a single query");
+                _loggingHelper.LogLine($"Identifying {res} {feedback_core} in {fb_qualifier} topics, as a single query");
             }
         }
         catch (Exception e)
@@ -258,37 +382,42 @@ public class TopicHelper
     }
 
 
-    public void mesh_match_topics(string topic_table, string schema, 
-                                  int min_id, int max_id, int rec_batch, bool code_all)
+    private void match_to_mesh_topics(int min_id, int max_id, int rec_batch)
     {
-        string sql_string = $@"Update {schema}.{topic_table} t 
+        if (_recodeTestDataOnly)    // test data 'trumps' the decisions above 
+        {
+            scope_qualifier = topic_type == "study" 
+                ? " and t.sd_sid in (select sd_sid from mn.test_study_list) "
+                : " and t.sd_oid in (select sd_oid from mn.test_object_list) ";
+            fb_qualifier = "test data";
+        }
+        
+        string sql_string = $@"Update ad.{topic_table} t 
                                set mesh_code = m.code,
                                mesh_value = m.term,
                                coded_on = CURRENT_TIMESTAMP
                                from context_ctx.mesh_lookup m
-                               where lower(t.original_value) = m.entry ";
-        sql_string += code_all ? "" : " and coded_on is null ";
-        
-        string table = topic_table == "study_topics" ? "study": "object";
-        string feedback_core = $"{table} topic codes ";
-        string qualifier = code_all ? "for all topics" : "for uncoded topics"; 
+                               where lower(t.original_value) = m.entry 
+                               {scope_qualifier}";
+
+        string feedback_core = $"{topic_type} topic codes ";
         try
         {
             if (max_id - min_id > rec_batch)
             {
                 for (int r = min_id; r <= max_id; r += rec_batch)
                 {
-                    string batch_sql_string = sql_string + " and id >= " + r + " and id < " + (r + rec_batch);
+                    string batch_sql_string = sql_string + " and t.id >= " + r + " and t.id < " + (r + rec_batch);
                     int res_r = ExecuteSQL(batch_sql_string);
                     int e = r + rec_batch < max_id ? r + rec_batch : max_id;
-                    string feedback = $"Updating {res_r} {feedback_core} {qualifier}, ids {r} to {e}";
+                    string feedback = $"Updating {res_r} {feedback_core} in {fb_qualifier} topics, ids {r} to {e}";
                     _loggingHelper.LogLine(feedback);
                 }
             }
             else
             {
                 int res = ExecuteSQL(sql_string);
-                _loggingHelper.LogLine($"Updating {res} {feedback_core} {qualifier}, as a single query");
+                _loggingHelper.LogLine($"Updating {res} {feedback_core} in {fb_qualifier} topics, as a single query");
             }
         }
         catch (Exception e)
@@ -298,153 +427,16 @@ public class TopicHelper
         }
     }
     
-
-    public void mesh_delete_duplicates(string topic_table, string schema, int min_id, int max_id, 
-                                         int rec_batch, bool code_all)
-    {
-        // Changing to MESH codes may result in duplicate MESH terms (2 or more).
-        // All but one of the duplicates should be removed.
-        // The sql statements required are defined at the top of the procedure to make the processes
-        // themselves much more concise and easier to understand.
-        
-        // The two sql clauses below will be used to create a temp table that holds the sd_sid / sd_oid,
-        // mesh value and count of all the duplicated study / object - mesh combinations.
-        
-        string id_field = topic_table == "study_topics" ? "sd_sid": "sd_oid";
-        string top_sql = $@"drop table if exists {schema}.temp_topic_dups;
-                         create table {schema}.temp_topic_dups as 
-                         select t.{id_field}, t.mesh_value, count(t.id) 
-                         from {schema}.{topic_table} t ";
-        if (!code_all)
-        {
-            top_sql += " inner join ad.uncoded_topic_records r on t.id = r.id ";
-        }
-        top_sql += " where mesh_value is not null ";  
-        
-        string grouping_sql =  $@" group by t.{id_field}, t.mesh_value 
-                               having count(t.id) > 1";
-        
-        // The first statement below creates a table that has fields from all the records in the topics table
-        // involved in duplications, while the second creates a table with the minimum id records for all the  
-        // duplicated sets. N.B. When 'chunking' is in operation both statements require additional clauses.
-       
-        string make_table1_sql = $@"drop table if exists {schema}.all_duplicated_topic_ids;
-                                  create table {schema}.all_duplicated_topic_ids
-                                  as
-                                  select t.{id_field}, t.mesh_value, t.id from  
-                                  {schema}.{topic_table} t inner join {schema}.temp_topic_dups d
-                                  on t.{id_field} = d.{id_field}
-                                  and t.mesh_value = d.mesh_value ";
-  
-        string make_table2_sql = $@"drop table if exists {schema}.min_duplicated_topic_ids;
-                                  create table {schema}.min_duplicated_topic_ids
-                                  as 
-                                  select t.{id_field}, t.mesh_value, min(t.id) as min_id from 
-                                  {schema}.{topic_table} t inner join {schema}.temp_topic_dups d
-                                  on t.{id_field} = d.{id_field}
-                                  and t.mesh_value = d.mesh_value ";
-        
-        // The first statement below generates another temp table, with the ids of the records to be deleted,
-        // by left joining the first table against the second. The second statement carries out the deletion.
-        
-        string make_table3_sql = $@"drop table if exists {schema}.topic_ids_to_delete;
-                                create table {schema}.topic_ids_to_delete
-                                as
-                                select a.id from {schema}.all_duplicated_topic_ids a
-                                LEFT JOIN {schema}.min_duplicated_topic_ids m                                          
-                                on a.{id_field} = m.{id_field}
-                                and a.mesh_value = m.mesh_value
-                                and a.id = m.min_id
-                                where m.min_id is null; ";
-        
-        string delete_sql = $@"delete from {schema}.{topic_table} t
-                           using {schema}.topic_ids_to_delete d
-                           where t.id = d.id;";
-        
-        string table = topic_table == "study_topics" ? "study": "object";
-        string feedback_core = $"duplicates in {table} topic codes -";
-        string qualifier = code_all ? "for all topics" : "for uncoded topics";
-        try
-        {
-            string sql_string;
-            if (max_id - min_id > rec_batch)
-            {
-                for (int r = min_id; r <= max_id; r += rec_batch)
-                {
-                    string id_qualifier = $" and t.id >= {r} and t.id < {r + rec_batch} ";
-                    sql_string = top_sql + id_qualifier + grouping_sql;
-                    ExecuteSQL(sql_string);
-                    int res_r = GetTableCount(schema, "temp_topic_dups");
-                    if (res_r > 0)
-                    {
-                        int e = r + rec_batch < max_id ? r + rec_batch : max_id;
-                        _loggingHelper.LogLine($"Identifying {res_r} {feedback_core} {qualifier}, ids {r} to {e}");
-                        string make_table1 = make_table1_sql + $" where t.id >= {r} and t.id < {e} ";
-                        ExecuteSQL(make_table1);  // creates table with all topic records involved in duplicates
-                        string make_table2 = make_table2_sql + @$" where t.id >= {r} and t.id < {e} 
-                                              group by t.{id_field}, t.mesh_value ";
-                        ExecuteSQL(make_table2);  // creates table with min id topic records involved in duplicates
-                        ExecuteSQL(make_table3_sql);  // creates the table wih the ids of the records to duplicate
-                        int res_b = ExecuteSQL(delete_sql);        // Does the deletion
-                        _loggingHelper.LogLine($"Deleted {res_b} {feedback_core} {qualifier}, ids {r} to {e}");
-                    }
-                }
-            }
-            else
-            {
-                sql_string = top_sql + grouping_sql;
-                ExecuteSQL(sql_string);
-                int res = GetTableCount(schema, "temp_topic_dups");
-                if (res > 0)
-                {
-                    _loggingHelper.LogLine($"Identifying {res} {feedback_core} {qualifier}, as a single query");
-                    ExecuteSQL(make_table1_sql);  // creates table with all topic records involved in duplicates
-                    string make_table2 = make_table2_sql + @$" group by t.{id_field}, t.mesh_value ";
-                    ExecuteSQL(make_table2);  // creates table with min id topic records involved in duplicates
-                    ExecuteSQL(make_table3_sql);  // creates the table wih the ids of the records to duplicate
-                    int res_a = ExecuteSQL(delete_sql);        // Does the deletion
-                    _loggingHelper.LogLine($"Deleted {res_a} {feedback_core} {qualifier}, as a single query");
-                }
-            }
-
-            // tidy up the temp tables
-
-             sql_string = $@"drop table if exists {schema}.temp_topic_dups;
-             drop table if exists {schema}.all_duplicated_topic_ids;
-             drop table if exists {schema}.min_duplicated_topic_ids;
-             drop table if exists {schema}.topic_ids_to_delete;";
-             ExecuteSQL(sql_string);
-        }
-        catch (Exception e)
-        {
-            string eres = e.Message;
-            _loggingHelper.LogError("In remove duplicate topics: " + eres);
-        }
-    }
- 
-   
-    public int store_unmatched_topic_values(string source_type, int source_id)
+    public int store_unmatched_topic_values(int source_id)
     {
         string sql_string = @"delete from context_ctx.to_match_topics where source_id = " + source_id ;
         ExecuteSQL(sql_string);
-        sql_string = @"insert into context_ctx.to_match_topics (source_id, topic_value, number_of) 
-                   select " + source_id + @", original_value, count(original_value)";
-        sql_string += source_type.ToLower() == "study"
-                            ? " from ad.study_topics t"
-                            : " from ad.object_topics t";
-        sql_string += @" where t.mesh_code is null 
-                         group by t.original_value;";
+        sql_string = $@"insert into context_ctx.to_match_topics (source_id, topic_value, number_of) 
+                   select {source_id}, original_value, count(original_value) from ad.{topic_table} t
+                   where t.mesh_code is null 
+                   group by t.original_value;";
         int res = ExecuteSQL(sql_string);
         _loggingHelper.LogLine($"Storing {res} topic codes not matched to MESH codes for review");
         return res;
-    }
-    
-    public void delete_temp_tables()
-    {
-        string sql_string = @"drop table if exists ad.temp_topic_dups;
-             drop table if exists ad.topic_ids_to_delete;
-             drop table if exists ad.uncoded_study_topic_records; 
-             drop table if exists ad.uncoded_object_topic_records ";
-        ExecuteSQL(sql_string);
     }
 }

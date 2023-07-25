@@ -8,7 +8,7 @@ public interface ILoggingHelper
     void LogLine(string message, string identifier = "");    
     void LogHeader(string header_text);
     void LogStudyHeader(Options opts, string dbLine);   
-    
+    void LogBlank(); 
     void LogError(string message);
     void LogCodeError(string header, string errorMessage, string? stackTrace);
     void LogParseError(string header, string errorNum, string errorType);   
