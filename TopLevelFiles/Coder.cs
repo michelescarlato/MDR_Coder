@@ -111,7 +111,6 @@ public class Coder
                 cb.UpdateObjectPeople();
                 cb.UpdateObjectOrganisations();
             }
-            cb.DropTempOrgTables();
         }
         
         
@@ -139,6 +138,7 @@ public class Coder
         
         // Tidy up 
         
+        cb.DropTempOrgTables();
         if (opts.ReCodeTestDataOnly)
         {
             th.TeardownTempTestDataTables();

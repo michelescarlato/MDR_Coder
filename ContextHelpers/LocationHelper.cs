@@ -107,7 +107,7 @@ namespace MDR_Coder
                  as 
                  select a.geoname_id, city_name, 
                     lower(a.alt_name) as name,
-                    lower(a.country_name) as country_name
+                    country_id
                  from 
                  context_ctx.city_names a";
             Execute_SQL(sql_string);
@@ -179,41 +179,39 @@ namespace MDR_Coder
             
             // Now considering cities that have not been coded. try to code them
             // An element of ambiguity here, so use the country as well.
-            // Still not perfect but better than nothing...
+            // So do the country first...Still not perfect but better than nothing...      
+            
+            sql_string = $@"update ad.study_locations c
+                        set country_id = n.geoname_id
+                        from ad.temp_country_names n
+                        where lower(c.country_name) = n.name {scope_qualifier}";
+            action = $"Coding {feedback_qualifier} country names, not coded using facility data";
+            Execute_LocationSQL(min_id, max_id, 100000, sql_string, action);
+            
+            sql_string = $@"update ad.study_locations c
+                        set country_name = n.country_name
+                        from ad.temp_country_names n 
+                        where c.country_id = n.geoname_id {scope_qualifier}";
+            action = $"Inserting default names for {feedback_qualifier} countries not coded using facility data";
+            Execute_LocationSQL(min_id, max_id, 100000, sql_string, action);
             
             sql_string = $@"update ad.study_locations c
                         set city_id = n.geoname_id
                         from ad.temp_city_names n
                         where c.city_name is not null
                         and lower(c.city_name) = n.name 
-                        and lower(c.country_name) = n.country_name {scope_qualifier}";
+                        and c.country_id = n.country_id {scope_qualifier}";
             action = $"Coding {feedback_qualifier} city names, not coded using facility data";
             Execute_LocationSQL(min_id, max_id, 100000, sql_string, action);
 
             sql_string = $@"update ad.study_locations c
-                        set city_name = n.city_name
+                        set city_name = n.city_name,
+                        coded_on = CURRENT_TIMESTAMP
                         from ad.temp_city_names n 
                         where c.city_id = n.geoname_id {scope_qualifier}";
             action = $"Inserting default names for {feedback_qualifier} cities not coded using facility data";
             Execute_LocationSQL(min_id, max_id, 100000, sql_string, action);
             
-            // Finally consider countries that have not been coded.
-
-            sql_string = $@"update ad.study_locations c
-                        set country_id = n.geoname_id
-                        from ad.temp_country_names n
-                        where c.country_name is not null
-                        and lower(c.country_name) = n.name {scope_qualifier}";
-            action = $"Coding {feedback_qualifier} country names, not coded using facility data";
-            Execute_LocationSQL(min_id, max_id, 100000, sql_string, action);
-            
-            sql_string = $@"update ad.study_locations c
-                        set country_name = n.country_name,
-                        coded_on = CURRENT_TIMESTAMP
-                        from ad.temp_country_names n 
-                        where c.country_id = n.geoname_id {scope_qualifier}";
-            action = $"Inserting default names for {feedback_qualifier} countries not coded using facility data";
-            Execute_LocationSQL(min_id, max_id, 100000, sql_string, action);
             FeedbackLocationResults("ad", "study_locations");
         }
 

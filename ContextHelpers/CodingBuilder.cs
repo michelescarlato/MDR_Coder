@@ -106,6 +106,7 @@ namespace MDR_Coder
         public void UpdateStudyOrgs()
         {
             org_helper.update_study_organisations();
+            org_helper.CheckDupStudyOrganisations();
             codeEvent!.num_orgs_to_match += org_helper.store_unmatched_study_organisation_names(source_id);
             _logging_helper.LogBlank();
         }

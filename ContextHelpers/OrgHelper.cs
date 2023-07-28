@@ -105,8 +105,6 @@ public class OrgHelper
     {
         int min_id = GetMinId("ad", "study_organisations");
         int max_id = GetMaxId("ad", "study_organisations");
-        //string qualifier = code_all ? "all" : "unmatched"; 
-        
         RemoveInitialThes("ad.study_organisations", "organisation_name", min_id, max_id, 200000);
         
         string sql_string = $@"update ad.study_organisations c
@@ -127,15 +125,134 @@ public class OrgHelper
         Execute_OrgSQL(min_id, max_id, 200000, sql_string, action);
         FeedbackResults("ad", "study_organisations", "organisation_id", "organisation_ror_id");
     }
-    
+
+    public void CheckDupStudyOrganisations()
+    {
+         // Sometimes the same organisation can be added as sponsor and funder but under
+         // different names. Their equality therefore only becomes apparent after coding.
+         // This function identifies studies with contributors of 54 and 58 with the same
+         // org code, and where they occur turns them into a single 112 coded record
+         
+         int min_id = GetMinId("ad", "studies");
+         int max_id = GetMaxId("ad", "studies");
+
+         string sql_string = @"Drop table if exists ad.temp_dup_org_ids;
+                               Create table ad.temp_dup_org_ids
+                               (sd_sid varchar, org_id int, 
+                                id54 int default 0,
+                                id58 int default 0 );";
+         Execute_SQL(sql_string);
+
+         string top_sql_string = @"Insert into ad.temp_dup_org_ids(sd_sid, org_id)
+                    select g.sd_sid, g.organisation_id
+                    from ad.study_organisations g 
+                    inner join ad.studies c
+                    on g.sd_sid = c.sd_sid 
+                    where g.organisation_id is not null 
+                    and g.contrib_type_id in (54,58)  ";
+
+          string bottom_sql_string = @"group by g.sd_sid, g.organisation_id
+                    having count(g.id) > 1 ;" ;
+         
+         string action = $"De-duplicating orgs (sponsors + funders) for {feedback_qualifier} study organisations";
+         
+         DeDupOrgs(min_id, max_id, 100000, top_sql_string, bottom_sql_string, action);   
+
+         sql_string = @"Drop table if exists ad.temp_dup_org_ids;";
+         Execute_SQL(sql_string);  
+         
+    }
+
+    private void DeDupOrgs(int min_id, int max_id, int rec_batch, string top_sql_string,
+               string bottom_sql_string, string action)
+    {
+        try
+        {
+            string sql_string;
+            if (max_id - min_id > rec_batch)
+            {
+                for (int r = min_id; r <= max_id; r += rec_batch)
+                {
+                    sql_string = "truncate table ad.temp_dup_org_ids;";
+                    Execute_SQL(sql_string);
+
+                    string batch_sql_string = top_sql_string
+                                              + " and c.id >= " + r + " and c.id < " + (r + rec_batch)
+                                              + bottom_sql_string;
+                    int res1 = Execute_SQL(batch_sql_string);
+                    int e = r + rec_batch < max_id ? r + rec_batch : max_id;
+                    string feedback =
+                        $"{action} - {res1} records identified as potential duplicates, in ids {r} to {e}";
+                    _loggingHelper.LogLine(feedback);
+                    UseDuplicatePOrgTableToAmendRecords();
+                }
+            }
+            else
+            {
+                sql_string = top_sql_string + bottom_sql_string;
+                int res = Execute_SQL(sql_string);
+                _loggingHelper.LogLine(
+                    $"{action} - {res} records identified as potential duplicates as a single query");
+                UseDuplicatePOrgTableToAmendRecords();
+            }
+        }
+        catch (Exception e)
+        {
+            string eres = e.Message;
+            _loggingHelper.LogError($"In {action}: " + eres);
+        }
+    }
+
+    private void UseDuplicatePOrgTableToAmendRecords()
+    {
+        // Obtain Ids of relevant study_organisations records
+
+        string sql_string = @"update ad.temp_dup_org_ids d
+        set id54 = g.id
+        from ad.study_organisations g
+        where d.sd_sid = g.sd_sid
+        and d.org_id = g.organisation_id
+        and g.contrib_type_id = 54;";
+        Execute_SQL(sql_string);
+
+        sql_string = @"update ad.temp_dup_org_ids d
+        set id58 = g.id
+        from ad.study_organisations g
+        where d.sd_sid = g.sd_sid
+        and d.org_id = g.organisation_id
+        and g.contrib_type_id = 58;";
+        Execute_SQL(sql_string);
+
+        // restrict the records to those with both type 54 and 58 contribs
+        // (54 = sponsor, 58 = funder)
+
+        sql_string = @"delete from ad.temp_dup_org_ids d
+        where id54 = 0 or id58 = 0;";
+        Execute_SQL(sql_string);
+
+        // update the study_organisations records to indicate joint role
+
+        sql_string = @"update ad.study_organisations g
+        set contrib_type_id = 112
+        from ad.temp_dup_org_ids d
+        where g.id = d.id54;";
+        Execute_SQL(sql_string);
+
+        // delete the now superfluous study_organisations records
+
+        sql_string = @"delete from ad.study_organisations g
+        using ad.temp_dup_org_ids d
+        where g.id = d.id58;";
+        Execute_SQL(sql_string);
+    }
+ 
+
     // Code Study Identifiers
 
     public void update_study_identifiers()
     {
         int min_id = GetMinId("ad", "study_identifiers");
         int max_id = GetMaxId("ad", "study_identifiers");
-        //string qualifier = code_all ? "all" : "unmatched"; 
-        
         RemoveInitialThes("ad.study_identifiers", "source", min_id, max_id, 200000);
         
         string sql_string = $@"update ad.study_identifiers c
@@ -177,8 +294,6 @@ public class OrgHelper
     {
         int min_id = GetMinId("ad", "study_people");
         int max_id = GetMaxId("ad", "study_people");
-        //string qualifier = code_all ? "all" : "unmatched"; 
-        
         RemoveInitialThes("ad.study_people", "organisation_name",min_id, max_id, 200000);
         
         string sql_string = $@"update ad.study_people c
@@ -208,8 +323,6 @@ public class OrgHelper
     {
         int min_id = GetMinId("ad", "object_identifiers");
         int max_id = GetMaxId("ad", "object_identifiers");
-        //string qualifier = code_all ? "all" : "unmatched"; 
-        
         RemoveInitialThes("ad.object_identifiers", "source", min_id, max_id, 200000);
         
         string sql_string = $@"update ad.object_identifiers c
@@ -238,8 +351,6 @@ public class OrgHelper
     {
         int min_id = GetMinId("ad", "object_organisations");
         int max_id = GetMaxId("ad", "object_organisations");
-        //string qualifier = code_all ? "all" : "unmatched"; 
-        
         RemoveInitialThes("ad.object_organisations", "organisation_name", min_id, max_id, 200000);
         
         string sql_string = $@"update ad.object_organisations c
@@ -269,8 +380,6 @@ public class OrgHelper
     {
         int min_id = GetMinId("ad", "object_people");
         int max_id = GetMaxId("ad", "object_people");
-        //string qualifier = code_all ? "all" : "unmatched"; 
-        
         RemoveInitialThes("ad.object_people", "organisation_name", min_id, max_id, 200000);
         
         string sql_string = $@"update ad.object_people c
@@ -300,8 +409,6 @@ public class OrgHelper
     {
         int min_id = GetMinId("ad", "data_objects");
         int max_id = GetMaxId("ad", "data_objects");
-        //string qualifier = code_all ? "all" : "unmatched"; 
-        
         RemoveInitialThes("ad.data_objects", "managing_org", min_id, max_id, 200000);
         
         string sql_string = $@"update ad.data_objects c
@@ -330,8 +437,6 @@ public class OrgHelper
     {
         int min_id = GetMinId("ad", "object_instances");
         int max_id = GetMaxId("ad", "object_instances");
-        //string qualifier = code_all ? "all" : "unmatched"; 
-        
         RemoveInitialThes("ad.object_instances", "system", min_id, max_id, 200000);
         
         string sql_string = $@"update ad.object_instances c
