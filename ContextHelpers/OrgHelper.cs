@@ -85,7 +85,6 @@ public class OrgHelper
         }
     }
     
-    
     // Set up relevant names for comparison
     public void establish_temp_tables()
     {
@@ -105,7 +104,9 @@ public class OrgHelper
     {
         int min_id = GetMinId("ad", "study_organisations");
         int max_id = GetMaxId("ad", "study_organisations");
+        
         RemoveInitialThes("ad.study_organisations", "organisation_name", min_id, max_id, 200000);
+        CodePharmaNames("study_organisations", "organisation_id", "organisation_name", object_scope_qualifier);
         
         string sql_string = $@"update ad.study_organisations c
                     set organisation_id = n.org_id
@@ -184,7 +185,7 @@ public class OrgHelper
                     string feedback =
                         $"{action} - {res1} records identified as potential duplicates, in ids {r} to {e}";
                     _loggingHelper.LogLine(feedback);
-                    UseDuplicatePOrgTableToAmendRecords();
+                    UseDuplicateOrgTableToAmendRecords();
                 }
             }
             else
@@ -193,7 +194,7 @@ public class OrgHelper
                 int res = Execute_SQL(sql_string);
                 _loggingHelper.LogLine(
                     $"{action} - {res} records identified as potential duplicates as a single query");
-                UseDuplicatePOrgTableToAmendRecords();
+                UseDuplicateOrgTableToAmendRecords();
             }
         }
         catch (Exception e)
@@ -203,7 +204,7 @@ public class OrgHelper
         }
     }
 
-    private void UseDuplicatePOrgTableToAmendRecords()
+    private void UseDuplicateOrgTableToAmendRecords()
     {
         // Obtain Ids of relevant study_organisations records
 
@@ -253,7 +254,9 @@ public class OrgHelper
     {
         int min_id = GetMinId("ad", "study_identifiers");
         int max_id = GetMaxId("ad", "study_identifiers");
+        
         RemoveInitialThes("ad.study_identifiers", "source", min_id, max_id, 200000);
+        CodePharmaNames("study_identifiers", "source_id", "source", object_scope_qualifier);
         
         string sql_string = $@"update ad.study_identifiers c
                     set source_id = n.org_id   
@@ -294,7 +297,9 @@ public class OrgHelper
     {
         int min_id = GetMinId("ad", "study_people");
         int max_id = GetMaxId("ad", "study_people");
+        
         RemoveInitialThes("ad.study_people", "organisation_name",min_id, max_id, 200000);
+        CodePharmaNames("study_people", "organisation_id", "organisation_name", object_scope_qualifier);
         
         string sql_string = $@"update ad.study_people c
                     set organisation_id = n.org_id
@@ -313,6 +318,7 @@ public class OrgHelper
                     where c.organisation_id = g.id {study_scope_qualifier}";
         action = $"Inserting default org data for {feedback_qualifier} study people";
         Execute_OrgSQL(min_id, max_id, 200000, sql_string, action);
+        
         FeedbackResults("ad", "study_people", "organisation_id", "organisation_ror_id");
     }
     
@@ -323,7 +329,9 @@ public class OrgHelper
     {
         int min_id = GetMinId("ad", "object_identifiers");
         int max_id = GetMaxId("ad", "object_identifiers");
+        
         RemoveInitialThes("ad.object_identifiers", "source", min_id, max_id, 200000);
+        CodePharmaNames("object_identifiers", "source_id", "source", object_scope_qualifier);
         
         string sql_string = $@"update ad.object_identifiers c
                     set source_id = n.org_id   
@@ -351,7 +359,9 @@ public class OrgHelper
     {
         int min_id = GetMinId("ad", "object_organisations");
         int max_id = GetMaxId("ad", "object_organisations");
+        
         RemoveInitialThes("ad.object_organisations", "organisation_name", min_id, max_id, 200000);
+        CodePharmaNames("object_organisations", "organisation_id", "organisation_name", object_scope_qualifier);
         
         string sql_string = $@"update ad.object_organisations c
                     set organisation_id = n.org_id
@@ -380,7 +390,9 @@ public class OrgHelper
     {
         int min_id = GetMinId("ad", "object_people");
         int max_id = GetMaxId("ad", "object_people");
+        
         RemoveInitialThes("ad.object_people", "organisation_name", min_id, max_id, 200000);
+        CodePharmaNames("object_people", "organisation_id", "organisation_name", object_scope_qualifier);
         
         string sql_string = $@"update ad.object_people c
                     set organisation_id = n.org_id
@@ -409,7 +421,9 @@ public class OrgHelper
     {
         int min_id = GetMinId("ad", "data_objects");
         int max_id = GetMaxId("ad", "data_objects");
+        
         RemoveInitialThes("ad.data_objects", "managing_org", min_id, max_id, 200000);
+        CodePharmaNames("data_objects", "managing_org_id", "managing_org", object_scope_qualifier);
         
         string sql_string = $@"update ad.data_objects c
                     set managing_org_id = n.org_id     
@@ -437,7 +451,9 @@ public class OrgHelper
     {
         int min_id = GetMinId("ad", "object_instances");
         int max_id = GetMaxId("ad", "object_instances");
+        
         RemoveInitialThes("ad.object_instances", "system", min_id, max_id, 200000);
+        CodePharmaNames("object_instances", "system_id", "system", object_scope_qualifier);
         
         string sql_string = $@"update ad.object_instances c
                     set system_id = n.org_id
@@ -493,8 +509,51 @@ public class OrgHelper
 
         Execute_SQL(sql_string);
     }
+
+    private void CodePharmaNames(string table_name, string field_to_update, string field_to_check, string scope_qualifier)
+    {
+        int res = 0;
+        res += CodePharma(table_name, field_to_update, "100189", $" where {field_to_check} ilike 'novartis%' {scope_qualifier}");
+        res += CodePharma(table_name, field_to_update, "100200", $" where {field_to_check} ilike 'novo nordisk%' {scope_qualifier}");
+        res += CodePharma(table_name, field_to_update, "109369", $" where {field_to_check} ilike '%viatris%' {scope_qualifier}");
+        res += CodePharma(table_name, field_to_update, "100164", $" where ({field_to_check} ilike 'pfizer%' and {field_to_check} not ilike '%viatris%') {scope_qualifier}");
+        res += CodePharma(table_name, field_to_update, "100227", $" where {field_to_check} ilike 'takeda%' {scope_qualifier} ");
+        res += CodePharma(table_name, field_to_update, "100163", $" where ({field_to_check} ilike 'gsk%' or {field_to_check} ilike 'glaxo%') {scope_qualifier}");
+        res += CodePharma(table_name, field_to_update, "100166", $" where {field_to_check} ilike 'astrazen%' {scope_qualifier}");
+        res += CodePharma(table_name, field_to_update, "100385", $" where ({field_to_check} ilike 'sanofi%' and {field_to_check} ilike '%pasteur%') {scope_qualifier}");
+        res += CodePharma(table_name, field_to_update, "100180", $" where ({field_to_check} ilike 'sanofi%' and {field_to_check} not ilike '%pasteur%') {scope_qualifier}");
+        res += CodePharma(table_name, field_to_update, "107838", $" where {field_to_check} ilike 'regeneron%' {scope_qualifier}");
+        res += CodePharma(table_name, field_to_update, "100173", $" where {field_to_check} ilike 'boehringer%' {scope_qualifier}");
+        res += CodePharma(table_name, field_to_update, "109370", $" where {field_to_check} ilike 'moderna%' {scope_qualifier}");
+        res += CodePharma(table_name, field_to_update, "100179", $" where {field_to_check} ilike 'bayer %' {scope_qualifier}");
+        res += CodePharma(table_name, field_to_update, "100232", $" where {field_to_check} ilike 'gilead %' {scope_qualifier}");
+        res += CodePharma(table_name, field_to_update, "100207", $" where {field_to_check} ilike 'amgen %' {scope_qualifier}");
+        res += CodePharma(table_name, field_to_update, "100176", $" where {field_to_check} ilike 'eli lilly%' {scope_qualifier}");
+        res += CodePharma(table_name, field_to_update, "100165", $" where ({field_to_check} ilike '%merck%' and {field_to_check} ilike '%sharp%') {scope_qualifier}");
+        res += CodePharma(table_name, field_to_update, "100165", $" where {field_to_check} ilike 'msd %' {scope_qualifier}");
+        res += CodePharma(table_name, field_to_update, "100341", $" where ({field_to_check} ilike 'merck%' and {field_to_check} not ilike '%sharp%') {scope_qualifier}");
+        res += CodePharma(table_name, field_to_update, "100175", $" where ({field_to_check} ilike 'bristol%' and {field_to_check} ilike '%myers%')  {scope_qualifier}");
+        res += CodePharma(table_name, field_to_update, "100175", $" where {field_to_check} ilike 'bms' {scope_qualifier}");
+        res += CodePharma(table_name, field_to_update, "100172", $" where ({field_to_check} ilike '%hoffmann%' and {field_to_check} ilike '%roche%') {scope_qualifier}");
+        res += CodePharma(table_name, field_to_update, "100172", $" where {field_to_check} ilike '%genentech%' {scope_qualifier}");
+        res += CodePharma(table_name, field_to_update, "100290", $" where {field_to_check} ilike 'johnson & johnson%' {scope_qualifier}");
+        res += CodePharma(table_name, field_to_update, "100107", $" where {field_to_check} ilike '%janssen%' {scope_qualifier}");
+        res += CodePharma(table_name, field_to_update, "100288", $" where {field_to_check} ilike 'abbvie%' {scope_qualifier}");
+        res += CodePharma(table_name, field_to_update, "105070", $" where {field_to_check} ilike 'biontech%' {scope_qualifier}");
+        res += CodePharma(table_name, field_to_update, "100254", $" where {field_to_check} ilike 'astellas%' {scope_qualifier}");
+        res += CodePharma(table_name, field_to_update, "100321", $" where {field_to_check} ilike 'biogen %' {scope_qualifier}");
+        
+        _loggingHelper.LogLine($"{res} records coded against common pharma names in {table_name}");
+    }
     
 
+    private int CodePharma(string table_name, string field_to_update, string id_value, string where_clause)
+    {
+        string sql_string = $@"update ad.{table_name} c
+        set {field_to_update} = {id_value} {where_clause}";
+        return Execute_SQL(sql_string);
+    }
+    
     private void RemoveInitialThes(string table_name, string field_name, int min_id, int max_id,  int rec_batch)
     {
         string action = $"Removing initial 'The's from org names in {table_name}";

@@ -12,16 +12,18 @@ public class TopicHelper
     private readonly string topic_type;
     private string scope_qualifier;
     private string fb_qualifier;
+    private bool? has_conditions_data;
 
     public TopicHelper(Source source, ILoggingHelper logger, int scope, bool recodeTestDataOnly)
     {
         _db_conn = source.db_conn ?? "";
+        _loggingHelper = logger;
+        _recodeTestDataOnly = recodeTestDataOnly;        
         topic_table = source.source_type!.ToLower() == "study" ? "study_topics" : "object_topics";
         topic_type = source.source_type!.ToLower();
-        _loggingHelper = logger;
-        _recodeTestDataOnly = recodeTestDataOnly;
         scope_qualifier = scope == 1 ? " and t.coded_on is null " : "";
         fb_qualifier = scope == 1 ? "unmatched" : "all";
+        has_conditions_data = source.has_study_conditions;   // N.B. No condition data for Pubmed at present
     }
 
     public int ExecuteSQL(string sql_string)
@@ -79,7 +81,10 @@ public class TopicHelper
         int min_id = GetMinId("ad", topic_table);
         int max_id = GetMaxId("ad", topic_table);
         delete_no_information_categories(min_id, max_id, 100000);
-        identify_conditions(min_id, max_id, 100000);        
+        if (has_conditions_data == true)
+        {
+            identify_conditions(min_id, max_id, 100000);
+        }
         identify_geographic(min_id, max_id, 100000);
         match_to_mesh_topics(min_id, max_id, 100000);
         FeedbackTopicResults("ad",topic_table, "mesh_code");

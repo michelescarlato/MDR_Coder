@@ -17,7 +17,7 @@ namespace MDR_Coder
             if (recodeTestDataOnly)
             {
                 // test data 'trumps' the scope above 
-                scope_qualifier = " and b.sd_sid in (select sd_sid from mn.test_study_list) ";
+                scope_qualifier = " and b.sd_oid in (select sd_oid from mn.test_object_list) ";
             }
         }
         
@@ -48,8 +48,8 @@ namespace MDR_Coder
         public void obtain_publisher_names()
         {
             string sql_string = $@"update ad.journal_details b
-                            set publisher_id = p.publisher_id,
-                            publisher = p.publisher,
+                            set publisher_id = p.mdr_org_id,
+                            publisher = p.mdr_org,
                             coded_on = CURRENT_TIMESTAMP(0)
                             from context_ctx.periodicals p
                             where b.journal_nlm_id = p.nlm_unique_id {scope_qualifier}";

@@ -206,10 +206,10 @@ public class LoggingHelper : ILoggingHelper
         
         // Write out the summary file.
         
-        var swSummary = new StreamWriter(_summaryLogfilePath, true, System.Text.Encoding.UTF8);
+        //var swSummary = new StreamWriter(_summaryLogfilePath, true, System.Text.Encoding.UTF8);
         
-        swSummary.Flush();
-        swSummary.Close();
+        //swSummary.Flush();
+        //swSummary.Close();
     }
     
     
