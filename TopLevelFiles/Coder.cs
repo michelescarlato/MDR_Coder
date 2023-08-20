@@ -13,31 +13,22 @@ public class Coder
     
     public void Run(Options opts)
     {
-        try
-        {
-            // Simply code the data for each listed source.
+        // Simply code the data for each listed source.
 
-            foreach (int sourceId in opts.SourceIds!)
+        foreach (int sourceId in opts.SourceIds!)
+        {
+            Source? source = _monDataLayer.FetchSourceParameters(sourceId);
+            if (source is not null)
             {
-                Source? source = _monDataLayer.FetchSourceParameters(sourceId);
-                if (source is not null)
-                {
-                    _loggingHelper.OpenLogFile(source.database_name!);
-                    _loggingHelper.LogHeader("STARTING CODER");
-                    _loggingHelper.LogCommandLineParameters(opts);
-                    CodeData(source, opts);
-                }
+                _loggingHelper.OpenLogFile(source.database_name!);
+                _loggingHelper.LogHeader("STARTING CODER");
+                _loggingHelper.LogCommandLineParameters(opts);
+                CodeData(source, opts);
             }
-
-            _loggingHelper.CloseLog();
         }
 
-        catch (Exception e)
-        {
-            _loggingHelper.LogHeader("UNHANDLED EXCEPTION");
-            _loggingHelper.LogCodeError("Coder application aborted", e.Message, e.StackTrace);
-            _loggingHelper.CloseLog();
-        }
+        _loggingHelper.CloseLog();
+
     }
 
 
