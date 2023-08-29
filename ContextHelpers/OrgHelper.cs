@@ -104,10 +104,7 @@ public class OrgHelper
     {
         int min_id = GetMinId("ad", "study_organisations");
         int max_id = GetMaxId("ad", "study_organisations");
-        
-        RemoveInitialThes("ad.study_organisations", "organisation_name", min_id, max_id, 200000);
-        CodePharmaNames("study_organisations", "organisation_id", "organisation_name", object_scope_qualifier);
-        
+       
         string sql_string = $@"update ad.study_organisations c
                     set organisation_id = n.org_id
                     from ad.temp_org_names n
@@ -127,7 +124,7 @@ public class OrgHelper
         FeedbackResults("ad", "study_organisations", "organisation_id", "organisation_ror_id");
     }
 
-    public void CheckDupStudyOrganisations()
+    public void CheckDupStudyOrganisationsUsingIds()
     {
          // Sometimes the same organisation can be added as sponsor and funder but under
          // different names. Their equality therefore only becomes apparent after coding.
@@ -152,20 +149,55 @@ public class OrgHelper
                     where g.organisation_id is not null 
                     and g.contrib_type_id in (54,58)  ";
 
-          string bottom_sql_string = @"group by g.sd_sid, g.organisation_id
+          string bottom_sql_string = @" group by g.sd_sid, g.organisation_id
                     having count(g.id) > 1 ;" ;
          
-         string action = $"De-duplicating orgs (sponsors + funders) for {feedback_qualifier} study organisations";
+         string action = $"De-duplicating orgs (sponsors + funders) using ids for {feedback_qualifier} study organisations";
          
-         DeDupOrgs(min_id, max_id, 100000, top_sql_string, bottom_sql_string, action);   
+         DeDupOrgs(min_id, max_id, 100000, top_sql_string, bottom_sql_string, action, "ids");   
 
          sql_string = @"Drop table if exists ad.temp_dup_org_ids;";
          Execute_SQL(sql_string);  
-         
     }
+    
+    public void CheckDupStudyOrganisationsUsingNames()
+    {
+        // Sometimes the same organisation can be added as sponsor and funder, be uncoded,
+        // but have the same name. This function identifies studies with contributors of 54 and 58
+        // with the same org name, and where they occur turns them into a single 112 coded record
+         
+        int min_id = GetMinId("ad", "studies");
+        int max_id = GetMaxId("ad", "studies");
 
+        string sql_string = @"Drop table if exists ad.temp_dup_org_names;
+                               Create table ad.temp_dup_org_names
+                               (sd_sid varchar, org_name varchar, 
+                                id54 int default 0,
+                                id58 int default 0 );";
+        Execute_SQL(sql_string);
+
+        string top_sql_string = @"Insert into ad.temp_dup_org_names(sd_sid, org_name)
+                    select g.sd_sid, g.organisation_name
+                    from ad.study_organisations g 
+                    inner join ad.studies c
+                    on g.sd_sid = c.sd_sid 
+                    where g.organisation_id is null 
+                    and g.contrib_type_id in (54,58)  ";
+
+        string bottom_sql_string = @" group by g.sd_sid, g.organisation_name
+                    having count(g.id) > 1 ;" ;
+         
+        string action = $"De-duplicating orgs (sponsors + funders) using names for {feedback_qualifier} study organisations";
+         
+        DeDupOrgs(min_id, max_id, 100000, top_sql_string, bottom_sql_string, action, "names");   
+
+        sql_string = @"Drop table if exists ad.temp_dup_org_names;";
+        Execute_SQL(sql_string);  
+    }
+    
+    
     private void DeDupOrgs(int min_id, int max_id, int rec_batch, string top_sql_string,
-               string bottom_sql_string, string action)
+               string bottom_sql_string, string action, string comp_type)
     {
         try
         {
@@ -174,7 +206,7 @@ public class OrgHelper
             {
                 for (int r = min_id; r <= max_id; r += rec_batch)
                 {
-                    sql_string = "truncate table ad.temp_dup_org_ids;";
+                    sql_string = $"truncate table ad.temp_dup_org_{comp_type};";
                     Execute_SQL(sql_string);
 
                     string batch_sql_string = top_sql_string
@@ -183,9 +215,9 @@ public class OrgHelper
                     int res1 = Execute_SQL(batch_sql_string);
                     int e = r + rec_batch < max_id ? r + rec_batch : max_id;
                     string feedback =
-                        $"{action} - {res1} records identified as potential duplicates, in ids {r} to {e}";
+                        $"{action} - {res1} records identified as potential duplicates, using {comp_type}, in ids {r} to {e}";
                     _loggingHelper.LogLine(feedback);
-                    UseDuplicateOrgTableToAmendRecords();
+                    UseDuplicateOrgTableToAmendRecords(comp_type);
                 }
             }
             else
@@ -193,8 +225,8 @@ public class OrgHelper
                 sql_string = top_sql_string + bottom_sql_string;
                 int res = Execute_SQL(sql_string);
                 _loggingHelper.LogLine(
-                    $"{action} - {res} records identified as potential duplicates as a single query");
-                UseDuplicateOrgTableToAmendRecords();
+                    $"{action} - {res} records identified as potential duplicates, using {comp_type}, as a single query");
+                UseDuplicateOrgTableToAmendRecords(comp_type);
             }
         }
         catch (Exception e)
@@ -203,46 +235,49 @@ public class OrgHelper
             _loggingHelper.LogError($"In {action}: " + eres);
         }
     }
+    
 
-    private void UseDuplicateOrgTableToAmendRecords()
+
+    private void UseDuplicateOrgTableToAmendRecords(string comp_type)
     {
         // Obtain Ids of relevant study_organisations records
+        string sing_type = comp_type == "ids" ? "id" : "name";
 
-        string sql_string = @"update ad.temp_dup_org_ids d
+        string sql_string = $@"update ad.temp_dup_org_{comp_type} d
         set id54 = g.id
         from ad.study_organisations g
         where d.sd_sid = g.sd_sid
-        and d.org_id = g.organisation_id
+        and d.org_{sing_type} = g.organisation_{sing_type}
         and g.contrib_type_id = 54;";
         Execute_SQL(sql_string);
 
-        sql_string = @"update ad.temp_dup_org_ids d
+        sql_string = $@"update ad.temp_dup_org_{comp_type} d
         set id58 = g.id
         from ad.study_organisations g
         where d.sd_sid = g.sd_sid
-        and d.org_id = g.organisation_id
+        and d.org_{sing_type} = g.organisation_{sing_type}
         and g.contrib_type_id = 58;";
         Execute_SQL(sql_string);
 
         // restrict the records to those with both type 54 and 58 contribs
         // (54 = sponsor, 58 = funder)
 
-        sql_string = @"delete from ad.temp_dup_org_ids d
-        where id54 = 0 or id58 = 0;";
+        sql_string = $@"delete from ad.temp_dup_org_{comp_type} d
+        where id54 = 0 or id58 = 0; ";
         Execute_SQL(sql_string);
 
         // update the study_organisations records to indicate joint role
 
-        sql_string = @"update ad.study_organisations g
+        sql_string = $@"update ad.study_organisations g
         set contrib_type_id = 112
-        from ad.temp_dup_org_ids d
-        where g.id = d.id54;";
+        from ad.temp_dup_org_{comp_type} d
+        where g.id = d.id54; ";
         Execute_SQL(sql_string);
 
         // delete the now superfluous study_organisations records
 
-        sql_string = @"delete from ad.study_organisations g
-        using ad.temp_dup_org_ids d
+        sql_string = $@"delete from ad.study_organisations g
+        using ad.temp_dup_org_{comp_type} d
         where g.id = d.id58;";
         Execute_SQL(sql_string);
     }
@@ -254,9 +289,6 @@ public class OrgHelper
     {
         int min_id = GetMinId("ad", "study_identifiers");
         int max_id = GetMaxId("ad", "study_identifiers");
-        
-        RemoveInitialThes("ad.study_identifiers", "source", min_id, max_id, 200000);
-        CodePharmaNames("study_identifiers", "source_id", "source", object_scope_qualifier);
         
         string sql_string = $@"update ad.study_identifiers c
                     set source_id = n.org_id   
@@ -274,20 +306,7 @@ public class OrgHelper
         action = $"Inserting default org data for {feedback_qualifier} study identifiers";
         Execute_OrgSQL(min_id, max_id, 200000, sql_string, action);
         FeedbackResults("ad", "study_identifiers", "source_id", "source_ror_id");
-
-        // seems to only apply to some CTG records (need to have done study orgs first)
-       
-        sql_string = $@"update ad.study_identifiers c
-               set source_id = sc.organisation_id,
-               source = sc.organisation_name,
-               source_ror_id = sc.organisation_ror_id,
-               coded_on = CURRENT_TIMESTAMP    
-               from ad.study_organisations sc
-               where c.sd_sid = sc.sd_sid
-               and (c.source ilike 'sponsor' 
-               or c.source ilike 'company internal')
-               and sc.contrib_type_id = 54 ";
-        Execute_OrgSQL(min_id, max_id, 200000, sql_string, "Updating org data for sponsor study identifiers");
+        
     }
     
 
@@ -297,9 +316,6 @@ public class OrgHelper
     {
         int min_id = GetMinId("ad", "study_people");
         int max_id = GetMaxId("ad", "study_people");
-        
-        RemoveInitialThes("ad.study_people", "organisation_name",min_id, max_id, 200000);
-        CodePharmaNames("study_people", "organisation_id", "organisation_name", object_scope_qualifier);
         
         string sql_string = $@"update ad.study_people c
                     set organisation_id = n.org_id
@@ -330,9 +346,6 @@ public class OrgHelper
         int min_id = GetMinId("ad", "object_identifiers");
         int max_id = GetMaxId("ad", "object_identifiers");
         
-        RemoveInitialThes("ad.object_identifiers", "source", min_id, max_id, 200000);
-        CodePharmaNames("object_identifiers", "source_id", "source", object_scope_qualifier);
-        
         string sql_string = $@"update ad.object_identifiers c
                     set source_id = n.org_id   
                     from ad.temp_org_names n
@@ -359,9 +372,6 @@ public class OrgHelper
     {
         int min_id = GetMinId("ad", "object_organisations");
         int max_id = GetMaxId("ad", "object_organisations");
-        
-        RemoveInitialThes("ad.object_organisations", "organisation_name", min_id, max_id, 200000);
-        CodePharmaNames("object_organisations", "organisation_id", "organisation_name", object_scope_qualifier);
         
         string sql_string = $@"update ad.object_organisations c
                     set organisation_id = n.org_id
@@ -391,9 +401,6 @@ public class OrgHelper
         int min_id = GetMinId("ad", "object_people");
         int max_id = GetMaxId("ad", "object_people");
         
-        RemoveInitialThes("ad.object_people", "organisation_name", min_id, max_id, 200000);
-        CodePharmaNames("object_people", "organisation_id", "organisation_name", object_scope_qualifier);
-        
         string sql_string = $@"update ad.object_people c
                     set organisation_id = n.org_id
                     from ad.temp_org_names n
@@ -422,9 +429,6 @@ public class OrgHelper
         int min_id = GetMinId("ad", "data_objects");
         int max_id = GetMaxId("ad", "data_objects");
         
-        RemoveInitialThes("ad.data_objects", "managing_org", min_id, max_id, 200000);
-        CodePharmaNames("data_objects", "managing_org_id", "managing_org", object_scope_qualifier);
-        
         string sql_string = $@"update ad.data_objects c
                     set managing_org_id = n.org_id     
                     from ad.temp_org_names n
@@ -451,9 +455,6 @@ public class OrgHelper
     {
         int min_id = GetMinId("ad", "object_instances");
         int max_id = GetMaxId("ad", "object_instances");
-        
-        RemoveInitialThes("ad.object_instances", "system", min_id, max_id, 200000);
-        CodePharmaNames("object_instances", "system_id", "system", object_scope_qualifier);
         
         string sql_string = $@"update ad.object_instances c
                     set system_id = n.org_id
@@ -509,86 +510,7 @@ public class OrgHelper
 
         Execute_SQL(sql_string);
     }
-
-    private void CodePharmaNames(string table_name, string field_to_update, string field_to_check, string scope_qualifier)
-    {
-        int res = 0;
-        res += CodePharma(table_name, field_to_update, "100189", $" where {field_to_check} ilike 'novartis%' {scope_qualifier}");
-        res += CodePharma(table_name, field_to_update, "100200", $" where {field_to_check} ilike 'novo nordisk%' {scope_qualifier}");
-        res += CodePharma(table_name, field_to_update, "109369", $" where {field_to_check} ilike '%viatris%' {scope_qualifier}");
-        res += CodePharma(table_name, field_to_update, "100164", $" where ({field_to_check} ilike 'pfizer%' and {field_to_check} not ilike '%viatris%') {scope_qualifier}");
-        res += CodePharma(table_name, field_to_update, "100227", $" where {field_to_check} ilike 'takeda%' {scope_qualifier} ");
-        res += CodePharma(table_name, field_to_update, "100163", $" where ({field_to_check} ilike 'gsk%' or {field_to_check} ilike 'glaxo%') {scope_qualifier}");
-        res += CodePharma(table_name, field_to_update, "100166", $" where {field_to_check} ilike 'astrazen%' {scope_qualifier}");
-        res += CodePharma(table_name, field_to_update, "100385", $" where ({field_to_check} ilike 'sanofi%' and {field_to_check} ilike '%pasteur%') {scope_qualifier}");
-        res += CodePharma(table_name, field_to_update, "100180", $" where ({field_to_check} ilike 'sanofi%' and {field_to_check} not ilike '%pasteur%') {scope_qualifier}");
-        res += CodePharma(table_name, field_to_update, "107838", $" where {field_to_check} ilike 'regeneron%' {scope_qualifier}");
-        res += CodePharma(table_name, field_to_update, "100173", $" where {field_to_check} ilike 'boehringer%' {scope_qualifier}");
-        res += CodePharma(table_name, field_to_update, "109370", $" where {field_to_check} ilike 'moderna%' {scope_qualifier}");
-        res += CodePharma(table_name, field_to_update, "100179", $" where {field_to_check} ilike 'bayer %' {scope_qualifier}");
-        res += CodePharma(table_name, field_to_update, "100232", $" where {field_to_check} ilike 'gilead %' {scope_qualifier}");
-        res += CodePharma(table_name, field_to_update, "100207", $" where {field_to_check} ilike 'amgen %' {scope_qualifier}");
-        res += CodePharma(table_name, field_to_update, "100176", $" where {field_to_check} ilike 'eli lilly%' {scope_qualifier}");
-        res += CodePharma(table_name, field_to_update, "100165", $" where ({field_to_check} ilike '%merck%' and {field_to_check} ilike '%sharp%') {scope_qualifier}");
-        res += CodePharma(table_name, field_to_update, "100165", $" where {field_to_check} ilike 'msd %' {scope_qualifier}");
-        res += CodePharma(table_name, field_to_update, "100341", $" where ({field_to_check} ilike 'merck%' and {field_to_check} not ilike '%sharp%') {scope_qualifier}");
-        res += CodePharma(table_name, field_to_update, "100175", $" where ({field_to_check} ilike 'bristol%' and {field_to_check} ilike '%myers%')  {scope_qualifier}");
-        res += CodePharma(table_name, field_to_update, "100175", $" where {field_to_check} ilike 'bms' {scope_qualifier}");
-        res += CodePharma(table_name, field_to_update, "100172", $" where ({field_to_check} ilike '%hoffmann%' and {field_to_check} ilike '%roche%') {scope_qualifier}");
-        res += CodePharma(table_name, field_to_update, "100172", $" where {field_to_check} ilike '%genentech%' {scope_qualifier}");
-        res += CodePharma(table_name, field_to_update, "100290", $" where {field_to_check} ilike 'johnson & johnson%' {scope_qualifier}");
-        res += CodePharma(table_name, field_to_update, "100107", $" where {field_to_check} ilike '%janssen%' {scope_qualifier}");
-        res += CodePharma(table_name, field_to_update, "100288", $" where {field_to_check} ilike 'abbvie%' {scope_qualifier}");
-        res += CodePharma(table_name, field_to_update, "105070", $" where {field_to_check} ilike 'biontech%' {scope_qualifier}");
-        res += CodePharma(table_name, field_to_update, "100254", $" where {field_to_check} ilike 'astellas%' {scope_qualifier}");
-        res += CodePharma(table_name, field_to_update, "100321", $" where {field_to_check} ilike 'biogen %' {scope_qualifier}");
-        
-        _loggingHelper.LogLine($"{res} records coded against common pharma names in {table_name}");
-    }
-    
-
-    private int CodePharma(string table_name, string field_to_update, string id_value, string where_clause)
-    {
-        string sql_string = $@"update ad.{table_name} c
-        set {field_to_update} = {id_value} {where_clause}";
-        return Execute_SQL(sql_string);
-    }
-    
-    private void RemoveInitialThes(string table_name, string field_name, int min_id, int max_id,  int rec_batch)
-    {
-        string action = $"Removing initial 'The's from org names in {table_name}";
-        
-        string base_sql = $@"update {table_name} c
-        set {field_name} = trim(substring({field_name}, 4)) 
-        where {field_name} ilike 'The %'
-        and cardinality(string_to_array({field_name} , ' ')) > 2";
-        
-        try
-        {
-            if (max_id - min_id > rec_batch)
-            {
-                for (int r = min_id; r <= max_id; r += rec_batch)
-                {
-                    string batch_sql_string = base_sql + " and c.id >= " + r + " and c.id < " + (r + rec_batch);
-                    int res1 = Execute_SQL(batch_sql_string);
-                    int e = r + rec_batch < max_id ? r + rec_batch : max_id;
-                    string feedback = $"{action} - {res1} records in ids {r} to {e}";
-                    _loggingHelper.LogLine(feedback);
-                }
-            }
-            else
-            {
-                int res = Execute_SQL(base_sql);
-                _loggingHelper.LogLine($"{action} - {res} records done as a single query");
-            }
-        }
-        catch (Exception e)
-        {
-            string eres = e.Message;
-            _loggingHelper.LogError($"In {action}: " + eres);
-        }
-    }
-    
+   
 
     // Store unmatched names
 
@@ -601,7 +523,7 @@ public class OrgHelper
         sql_string = $@"insert into context_ctx.to_match_orgs (source_id, source_table, org_name, number_of) 
         select {source_id}, 'study_identifiers', source, count(source) 
         from ad.study_identifiers 
-        where source_id is null 
+        where source_id is null and source is not null
         group by source; ";
 
         int res = Execute_SQL(sql_string);
@@ -618,7 +540,7 @@ public class OrgHelper
         sql_string = $@"insert into context_ctx.to_match_orgs (source_id, source_table, org_name, number_of) 
         select {source_id}, 'study_organisations', organisation_name, count(organisation_name) 
         from ad.study_organisations 
-        where organisation_id is null 
+        where organisation_id is null and organisation_name is not null and contrib_type_id <> 70     
         group by organisation_name;";
 
         int res = Execute_SQL(sql_string);
@@ -635,7 +557,7 @@ public class OrgHelper
         sql_string = $@"insert into context_ctx.to_match_orgs (source_id, source_table, org_name, number_of) 
         select {source_id}, 'study_people', organisation_name, count(organisation_name) 
         from ad.study_people 
-        where organisation_id is null 
+        where organisation_id is null and organisation_name is not null 
         group by organisation_name;";
 
         int res = Execute_SQL(sql_string);
@@ -652,7 +574,7 @@ public class OrgHelper
         sql_string = $@"insert into context_ctx.to_match_orgs (source_id, source_table, org_name, number_of) 
         select {source_id}, 'object_identifiers', source, count(source) 
         from ad.object_identifiers 
-        where source_id is null 
+        where source_id is null and source is not null 
         group by source; ";
 
         int res = Execute_SQL(sql_string);
@@ -670,7 +592,7 @@ public class OrgHelper
         sql_string = $@"insert into context_ctx.to_match_orgs (source_id, source_table, org_name, number_of) 
         select {source_id}, 'object_organisations', organisation_name, count(organisation_name) 
         from ad.object_organisations 
-        where organisation_id is null 
+        where organisation_id is null and organisation_name is not null 
         group by organisation_name;";
 
         int res = Execute_SQL(sql_string);
@@ -688,7 +610,7 @@ public class OrgHelper
         sql_string = $@"insert into context_ctx.to_match_orgs (source_id, source_table, org_name, number_of) 
         select {source_id}, 'object_people', organisation_name, count(organisation_name) 
         from ad.object_people 
-        where organisation_id is null 
+        where organisation_id is null and organisation_name is not null 
         group by organisation_name;";
 
         int res = Execute_SQL(sql_string);
@@ -706,7 +628,7 @@ public class OrgHelper
         sql_string = $@"insert into context_ctx.to_match_orgs (source_id, source_table, org_name, number_of) 
         select {source_id}, 'data_objects', managing_org, count(managing_org) 
         from ad.data_objects 
-        where managing_org_id is null 
+        where managing_org_id is null and managing_org is not null 
         group by managing_org; ";
 
         int res = Execute_SQL(sql_string); 
@@ -724,7 +646,7 @@ public class OrgHelper
         sql_string = $@"insert into context_ctx.to_match_orgs (source_id, source_table, org_name, number_of) 
         select {source_id}, 'object_instances', system, count(system) 
         from ad.object_instances 
-        where system_id is null 
+        where system_id is null and system is not null 
         group by system; ";
 
         int res = Execute_SQL(sql_string); 

@@ -98,7 +98,7 @@ internal class ParameterChecker
             _loggingHelper.OpenNoSourceLogFile();
             _loggingHelper.LogHeader("INVALID PARAMETERS");
             _loggingHelper.LogCommandLineParameters(opts);
-            _loggingHelper.LogCodeError("Importer application aborted", e.Message, e.StackTrace);
+            _loggingHelper.LogCodeError("Coder application aborted", e.Message, e.StackTrace);
             _loggingHelper.CloseLog();
             return new ParamsCheckResult(false, true, null);
         }

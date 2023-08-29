@@ -78,142 +78,12 @@ public class ConditionHelper
     {
         int min_id = GetMinId("study_conditions");
         int max_id = GetMaxId("study_conditions");
-       
-        // Then code the condition data in these 4 steps.
-        
-        identify_no_info_conditions(min_id, max_id, 200000);       
         match_conditions_using_code(min_id, max_id, 200000);           
         match_conditions_using_term(min_id, max_id, 200000);
         resolve_multiple_condition_entries();
     }
     
-    public void identify_no_info_conditions(int min_id, int max_id, int rec_batch)
-    {
-        // Only normally applies to newly added condition records (coded_on = null). 
-        // Previous condition records will already have been filtered by this process
-        
-        string top_string = $@"delete from ad.study_conditions c "  ;
 
-        string sql_string = top_string + $@" where (lower(original_value) = '' 
-                        or lower(original_value) = 'human'
-                        or lower(original_value) = 'humans'
-                        or lower(original_value) = 'other'
-                        or lower(original_value) = 'women'
-                        or lower(original_value) = 'child'
-                        or lower(original_value) = 'adolescent'
-                        or lower(original_value) = 'adolescents'
-                        or lower(original_value) = 'men') 
-                        {scope_qualifier}";
-        delete_no_info_conditions(sql_string, min_id, max_id, "A", rec_batch);
-
-        sql_string = top_string + $@" where (lower(original_value) = 'healthy adults' 
-                        or lower(original_value) = 'healthy adult'
-                        or lower(original_value) = 'healthy person'
-                             or lower(original_value) = 'healthy people'
-                        or lower(original_value) = 'female'
-                        or lower(original_value) = 'male'
-                        or lower(original_value) = 'healthy adult female'
-                        or lower(original_value) = 'healthy adult male') 
-                        {scope_qualifier}";
-        delete_no_info_conditions(sql_string, min_id, max_id, "B", rec_batch);
-
-        sql_string = top_string + $@" where (lower(original_value) = 'hv' 
-                        or lower(original_value) = 'healthy volunteer'
-                        or lower(original_value) = 'healthy volunteers'
-                        or lower(original_value) = 'volunteer'
-                        or lower(original_value) = 'healthy control'
-                        or lower(original_value) = 'normal control') 
-                        {scope_qualifier}";
-        delete_no_info_conditions(sql_string, min_id, max_id, "C", rec_batch);
-
-        sql_string = top_string + $@" where (lower(original_value) = 'healthy individual' 
-                        or lower(original_value) = 'healthy individuals'
-                        or lower(original_value) = 'n/a(healthy adults)'
-                        or lower(original_value) = 'n/a (healthy adults)'
-                        or lower(original_value) = 'none (healthy adults)'
-                        or lower(original_value) = 'healthy older adults'
-                        or lower(original_value) = 'healthy japanese subjects'
-                        or lower(original_value) = 'toxicity' 
-                        or lower(original_value) = 'health condition 1: o- medical and surgical') 
-                        {scope_qualifier}";
-        delete_no_info_conditions(sql_string, min_id, max_id, "D", rec_batch);
-        
-        sql_string = top_string + $@" where (lower(original_value) = 'body weight' 
-                        or lower(original_value) = 'disease'
-                        or lower(original_value) = 'emergencies'
-                        or lower(original_value) = 'healthy'
-                        or lower(original_value) = 'inflammation'
-                        or lower(original_value) = 'ischemia'
-                        or lower(original_value) = 'sclerosis'
-                        or lower(original_value) = 'thrombosis' 
-                        or lower(original_value) = 'ulcer') 
-                        {scope_qualifier}";
-        delete_no_info_conditions(sql_string, min_id, max_id, "E", rec_batch);
-        
-        sql_string = top_string + $@" where (lower(original_value) = 'body weight' 
-                        or lower(original_value) = 'surgery'
-                        or lower(original_value) = 'syndrome'
-                        or lower(original_value) = 'sleep'
-                        or lower(original_value) = 'public health'
-                        or lower(original_value) = 'public health - epidemiology'
-                        or lower(original_value) = 'public health - health promotion/education'
-                        or lower(original_value) = 'quality of life' 
-                        or lower(original_value) = 'recurrence') 
-                        {scope_qualifier}";
-        delete_no_info_conditions(sql_string, min_id, max_id, "F", rec_batch);
-        
-        sql_string = top_string + $@" where (lower(original_value) = 'pharmacokinetic study' 
-                        or lower(original_value) = 'pharmacokinetics and bioequivalence study in human'
-                        or lower(original_value) = 'physical activity'
-                        or lower(original_value) = 'physical function'
-                        or lower(original_value) = 'physical inactivity'
-                        or lower(original_value) = 'infarction'
-                        or lower(original_value) = 'fibrosis'
-                        or lower(original_value) = 'constriction, pathologic' 
-                        or lower(original_value) = 'critical illness'
-                        or lower(original_value) = 'critically ill patients' 
-                        or lower(original_value) = 'chronic disease') 
-                        {scope_qualifier}";
-        delete_no_info_conditions(sql_string, min_id, max_id, "G", rec_batch);
-    }
-
- 
-    public void delete_no_info_conditions(string sql_string, int min_id, int max_id, 
-                                          string delete_set, int rec_batch)
-    {
-        // Can be difficult to do this with large datasets of conditions.
-        string feedback_core = $"'no information' conditions (group {delete_set})";
-        try
-        {
-            if (max_id - min_id > rec_batch)
-            {
-                for (int r = min_id; r <= max_id; r += rec_batch)
-                {
-                    string batch_sql_string = sql_string + " and id >= " + r + " and id < " + (r + rec_batch);
-                    int res_r = ExecuteSQL(batch_sql_string);
-                    if (res_r > 0)
-                    {
-                        int e = r + rec_batch < max_id ? r + rec_batch : max_id;
-                        _loggingHelper.LogLine($"Deleting {res_r} {feedback_core} in {feedback_qualifier} records - {r} to {e}");
-                    }
-                }
-            }
-            else
-            {
-                int res = ExecuteSQL(sql_string);
-                if (res > 0)
-                {
-                    _loggingHelper.LogLine($"Deleting {res} {feedback_core} in {feedback_qualifier} records - as a single query");
-                }
-            }
-        }
-        catch (Exception e)
-        {
-            string eres = e.Message;
-            _loggingHelper.LogError("In deleting 'no information' conditions: " + eres);
-        }
-    }
-    
     public void match_conditions_using_code(int min_id, int max_id, int rec_batch)
     {
         string sql_string = $@"Update ad.study_conditions c
@@ -230,7 +100,7 @@ public class ConditionHelper
             {
                 for (int r = min_id; r <= max_id; r += rec_batch)
                 {
-                    string batch_sql_string = sql_string + " and t.id >= " + r + " and t.id < " + (r + rec_batch);
+                    string batch_sql_string = sql_string + " and c.id >= " + r + " and c.id < " + (r + rec_batch);
                     int res_r = ExecuteSQL(batch_sql_string);
                     int e = r + rec_batch < max_id ? r + rec_batch : max_id;
                     _loggingHelper.LogLine($"Updating {res_r} {feedback_core} in {feedback_qualifier} records - {r} to {e}");
@@ -265,7 +135,7 @@ public class ConditionHelper
             {
                 for (int r = min_id; r <= max_id; r += rec_batch)
                 {
-                    string batch_sql_string = sql_string + " and t.id >= " + r + " and t.id < " + (r + rec_batch);
+                    string batch_sql_string = sql_string + " and c.id >= " + r + " and c.id < " + (r + rec_batch);
                     int res_r = ExecuteSQL(batch_sql_string);
                     int e = r + rec_batch < max_id ? r + rec_batch : max_id;
                     _loggingHelper.LogLine($"Updating {res_r} {feedback_core} in {feedback_qualifier} records - {r} to {e}");

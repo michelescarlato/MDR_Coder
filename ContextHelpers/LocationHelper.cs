@@ -95,14 +95,14 @@ namespace MDR_Coder
         
         public void establish_temp_tables()
         {
-            string sql_string = $@"drop table if exists ad.temp_country_names;
+            string sql_string = @"drop table if exists ad.temp_country_names;
                  create table ad.temp_country_names 
                  as 
                  select a.geoname_id, country_name, lower(a.alt_name) as name from 
                  context_ctx.country_names a";
             Execute_SQL(sql_string);
             
-            sql_string = $@"drop table if exists ad.temp_city_names;
+            sql_string = @"drop table if exists ad.temp_city_names;
                  create table ad.temp_city_names 
                  as 
                  select a.geoname_id, city_name, 
@@ -123,8 +123,7 @@ namespace MDR_Coder
             string sql_string = $@"update ad.study_countries c
             set country_id = n.geoname_id
             from ad.temp_country_names n
-            where c.country_name is not null
-            and lower(c.country_name) = n.name {scope_qualifier}";
+            where lower(c.country_name) = n.name {scope_qualifier}";
             
             string action = $"Coding {feedback_qualifier} country names";
             Execute_LocationSQL(min_id, max_id, 200000, sql_string, action);
@@ -147,8 +146,6 @@ namespace MDR_Coder
         {
             int min_id = GetMinId("ad", "study_locations");
             int max_id = GetMaxId("ad", "study_locations");
-            
-            RemoveInitialThes("ad.study_locations", "facility", min_id, max_id, 200000);
             
             string sql_string = $@"update ad.study_locations c
                         set facility_org_id = n.org_id
@@ -184,7 +181,8 @@ namespace MDR_Coder
             sql_string = $@"update ad.study_locations c
                         set country_id = n.geoname_id
                         from ad.temp_country_names n
-                        where lower(c.country_name) = n.name {scope_qualifier}";
+                        where c.country_id is null
+                        and lower(c.country_name) = n.name {scope_qualifier}";
             action = $"Coding {feedback_qualifier} country names, not coded using facility data";
             Execute_LocationSQL(min_id, max_id, 100000, sql_string, action);
             
@@ -198,7 +196,7 @@ namespace MDR_Coder
             sql_string = $@"update ad.study_locations c
                         set city_id = n.geoname_id
                         from ad.temp_city_names n
-                        where c.city_name is not null
+                        where c.city_id is null
                         and lower(c.city_name) = n.name 
                         and c.country_id = n.country_id {scope_qualifier}";
             action = $"Coding {feedback_qualifier} city names, not coded using facility data";
@@ -244,114 +242,6 @@ namespace MDR_Coder
             }
         }
         
-
-        private void RemoveInitialThes(string table_name, string field_name, int min_id, int max_id, int rec_batch)
-        {
-            string action = $"Removing initial 'The's from org names in {table_name}";
-            
-            string base_sql = $@"update {table_name} c
-            set {field_name} = trim(substring({field_name}, 4)) 
-            where {field_name} ilike 'The %'
-            and cardinality(string_to_array({field_name} , ' ')) > 2";
-            
-            try
-            {
-                if (max_id - min_id > rec_batch)
-                {
-                    for (int r = 1; r <= max_id; r += rec_batch)
-                    {
-                        string batch_sql_string = base_sql + " and c.id >= " + r + " and c.id < " + (r + rec_batch);
-                        int res1 = Execute_SQL(batch_sql_string);
-                        int e = r + rec_batch < max_id ? r + rec_batch : max_id;
-                        string feedback = $"{action} - {res1} records in ids {r} to {e}";
-                        _loggingHelper.LogLine(feedback);
-                    }
-                }
-                else
-                {
-                    int res = Execute_SQL(base_sql);
-                    _loggingHelper.LogLine($"{action} - {res} records done as a single query");
-                }
-            }
-            catch (Exception e)
-            {
-                string eres = e.Message;
-                _loggingHelper.LogError($"In {action}: " + eres);
-            }
-        }
-        
-        private int StoreUncodedCities(int rec_batch, int source_id)
-        {
-            string action = $"Storing uncoded city names from study_locations";
-            int min_id = GetMinId("ad", "study_locations");
-            int max_id = GetMaxId("ad", "study_locations");
-            int number_of_loops = 0;
-            string base_sql = $@"insert into context_ctx.to_match_cities 
-                                 (source_id, source_table, city_name, number_of) 
-                                 select {source_id}, 'study_locations', city_name, count(city_name) 
-                                 from ad.study_locations c
-                                 where city_id is null ";
-            try
-            {
-                if (max_id - min_id > rec_batch)
-                {
-                    for (int r = 1; r <= max_id; r += rec_batch)
-                    {
-                        string batch_sql_string = base_sql + " and c.id >= " + r + " and c.id < " + (r + rec_batch);
-                        batch_sql_string += " group by city_name;";
-                        int res1 = Execute_SQL(batch_sql_string);
-                        int e = r + rec_batch < max_id ? r + rec_batch : max_id;
-                        string feedback = $"{action} - {res1} records in ids {r} to {e}";
-                        _loggingHelper.LogLine(feedback);
-                        number_of_loops++;
-                    }
-                }
-                else
-                {
-                    base_sql += " group by city_name;";
-                    int res = Execute_SQL(base_sql);
-                    _loggingHelper.LogLine($"{action} - {res} records done as a single query");
-                    number_of_loops = 1;
-                }
-
-                return number_of_loops;
-            }
-            catch (Exception e)
-            {
-                string eres = e.Message;
-                _loggingHelper.LogError($"In {action}: " + eres);
-                return 0;
-            }
-        }
-        
-        private void AggregateUncodedCityData(int source_id)
-        {
-            // Create a temp table with the aggregated data, delete the 
-            // existing data, and replace with the aggregated set
-            
-            string sql_string = $@"create table ad.temp_city_data as
-                            select source_id, city_name, 
-                            sum(number_of) as number_of
-                            from context_ctx.to_match_cities 
-                            where source_id = {source_id}
-                            group by source_id, city_name; ";
-           Execute_SQL(sql_string);    // number of aggregated records
-           
-           sql_string = $@"delete from context_ctx.to_match_cities 
-                           where source_id = {source_id} 
-                           and source_table = 'study_locations';";
-           Execute_SQL(sql_string);
-           
-           sql_string = $@"insert into context_ctx.to_match_cities 
-                           (source_id, source_table, city_name, number_of) 
-                           select source_id, 'study_locations', city_name, number_of
-                           from ad.temp_city_data ;";
-           Execute_SQL(sql_string);
-
-           sql_string = $@"drop table ad.temp_city_data ";
-           Execute_SQL(sql_string);
-        }
-
         
         // Store unmatched names
        
@@ -416,6 +306,83 @@ namespace MDR_Coder
             _loggingHelper.LogLine($"Stored {res} unmatched location city names, for review");
             return res;
         }
+        
+        
+        private int StoreUncodedCities(int rec_batch, int source_id)
+        {
+            string action = $"Storing uncoded city names from study_locations";
+            int min_id = GetMinId("ad", "study_locations");
+            int max_id = GetMaxId("ad", "study_locations");
+            int number_of_loops = 0;
+            string base_sql = $@"insert into context_ctx.to_match_cities 
+                                 (source_id, source_table, city_name, number_of) 
+                                 select {source_id}, 'study_locations', city_name, count(city_name) 
+                                 from ad.study_locations c
+                                 where city_id is null ";
+            try
+            {
+                if (max_id - min_id > rec_batch)
+                {
+                    for (int r = 1; r <= max_id; r += rec_batch)
+                    {
+                        string batch_sql_string = base_sql + " and c.id >= " + r + " and c.id < " + (r + rec_batch);
+                        batch_sql_string += " group by city_name;";
+                        int res1 = Execute_SQL(batch_sql_string);
+                        int e = r + rec_batch < max_id ? r + rec_batch : max_id;
+                        string feedback = $"{action} - {res1} records in ids {r} to {e}";
+                        _loggingHelper.LogLine(feedback);
+                        number_of_loops++;
+                    }
+                }
+                else
+                {
+                    base_sql += " group by city_name;";
+                    int res = Execute_SQL(base_sql);
+                    _loggingHelper.LogLine($"{action} - {res} records done as a single query");
+                    number_of_loops = 1;
+                }
+
+                return number_of_loops;
+            }
+            catch (Exception e)
+            {
+                string eres = e.Message;
+                _loggingHelper.LogError($"In {action}: " + eres);
+                return 0;
+            }
+        }
+        
+        
+        
+        private void AggregateUncodedCityData(int source_id)
+        {
+            // Create a temp table with the aggregated data, delete the 
+            // existing data, and replace with the aggregated set
+            
+            string sql_string = $@"create table ad.temp_city_data as
+                            select source_id, city_name, 
+                            sum(number_of) as number_of
+                            from context_ctx.to_match_cities 
+                            where source_id = {source_id}
+                            group by source_id, city_name; ";
+            Execute_SQL(sql_string);    // number of aggregated records
+           
+            sql_string = $@"delete from context_ctx.to_match_cities 
+                           where source_id = {source_id} 
+                           and source_table = 'study_locations';";
+            Execute_SQL(sql_string);
+           
+            sql_string = $@"insert into context_ctx.to_match_cities 
+                           (source_id, source_table, city_name, number_of) 
+                           select source_id, 'study_locations', city_name, number_of
+                           from ad.temp_city_data ;";
+            Execute_SQL(sql_string);
+
+            sql_string = $@"drop table ad.temp_city_data ";
+            Execute_SQL(sql_string);
+        }
+
+
         
         public void delete_temp_tables()
         {

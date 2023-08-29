@@ -43,6 +43,7 @@ public class Credentials : ICredentials
         builder.Password = Password;
         builder.Port = Port;
         builder.Database = database_name;
+        builder.KeepAlive = 300;
         return builder.ConnectionString;
     }
 }

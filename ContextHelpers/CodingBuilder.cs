@@ -24,7 +24,7 @@ namespace MDR_Coder
             connString = source.db_conn ?? "";
             source_id = source.id ?? 0;
             _logging_helper = logging_helper;
-            bool testDataOnly = opts.ReCodeTestDataOnly == true;
+            bool testDataOnly = opts.ReCodeTestDataOnly;
             
             pubmed_helper = new PubmedHelper(source, logging_helper, (int)opts.RecodePublishers!, testDataOnly) ;
             org_helper = new OrgHelper(source, logging_helper, (int)opts.RecodeOrgs!, testDataOnly);
@@ -32,7 +32,6 @@ namespace MDR_Coder
             topic_helper = new TopicHelper(source, logging_helper, (int)opts.RecodeTopics!, testDataOnly);
             condition_helper = new ConditionHelper(source, logging_helper, (int)opts.RecodeConditions!, testDataOnly);
         }
-
 
         public void EstablishContextForeignTables(Credentials creds)
         {
@@ -106,7 +105,8 @@ namespace MDR_Coder
         public void UpdateStudyOrgs()
         {
             org_helper.update_study_organisations();
-            org_helper.CheckDupStudyOrganisations();
+            org_helper.CheckDupStudyOrganisationsUsingIds();
+            org_helper.CheckDupStudyOrganisationsUsingNames();
             codeEvent!.num_orgs_to_match += org_helper.store_unmatched_study_organisation_names(source_id);
             _logging_helper.LogBlank();
         }
