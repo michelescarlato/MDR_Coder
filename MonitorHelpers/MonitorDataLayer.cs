@@ -64,11 +64,11 @@ public class MonDataLayer : IMonDataLayer
                   last_coded = current_timestamp
                   from 
                      (select so.sd_sid 
-                     FROM sd.studies so ";
+                     FROM ad.studies so ";
         string base_string = @" ) s
                       where s.sd_sid = src.sd_sid;";
 
-        UpdateLastImportedDate("studies", top_string, base_string, db_conn_string);
+        UpdateLastCodedDate("studies", top_string, base_string, db_conn_string);
     }
 
 
@@ -79,21 +79,22 @@ public class MonDataLayer : IMonDataLayer
                   last_coded = current_timestamp
                   from 
                      (select so.sd_oid 
-                      FROM sd.data_objects so ";
+                      FROM ad.data_objects so ";
         string base_string = @" ) s
                       where s.sd_oid = src.sd_oid;";
 
-        UpdateLastImportedDate("data_objects", top_string, base_string, db_conn_string);
+        UpdateLastCodedDate("data_objects", top_string, base_string, db_conn_string);
     }
+    
 
-    private void UpdateLastImportedDate(string tableName, string topSql, 
+    private void UpdateLastCodedDate(string tableName, string topSql, 
                                        string baseSql, string db_conn_string)
     {
         try
         {   
             using NpgsqlConnection conn = new(db_conn_string);
             string feedbackA = "Updating monitor records with date time of coding, ";
-            string sqlString = $"select count(*) from sd.{tableName}";
+            string sqlString = $"select count(*) from ad.{tableName}";
             int recCount  = conn.ExecuteScalar<int>(sqlString);
             int recBatch = 50000;
             if (recCount > recBatch)
@@ -119,7 +120,7 @@ public class MonDataLayer : IMonDataLayer
         catch (Exception e)
         {
             string res = e.Message;
-            _loggingHelper.LogError("In update last imported date (" + tableName + "): " + res);
+            _loggingHelper.LogError("In update last coded date (" + tableName + "): " + res);
         }
     }
 

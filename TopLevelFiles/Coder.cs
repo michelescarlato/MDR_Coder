@@ -1,4 +1,6 @@
-﻿namespace MDR_Coder;
+﻿using System.Resources;
+
+namespace MDR_Coder;
 
 public class Coder
 {
@@ -102,6 +104,12 @@ public class Coder
                 cb.UpdateObjectPeople();
                 cb.UpdateObjectOrganisations();
             }
+
+            if (source.has_object_bbmri_set is true)
+            {
+                cb.UpdateDataObjectOrgs();
+                cb.UpdateObjectIdentifiers();
+            }
         }
         
         
@@ -142,7 +150,7 @@ public class Coder
             }
             else
             {
-                // only do the objects table if there are no studies (e.g. PubMed).
+                // only do the objects table if there are no studies (e.g. PubMed, BBMRI).
 
                 _monDataLayer.UpdateObjectsCodedDate(codingId, source.db_conn);
             }

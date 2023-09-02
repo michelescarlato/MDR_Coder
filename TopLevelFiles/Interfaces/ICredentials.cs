@@ -2,10 +2,7 @@
 
 public interface ICredentials
 {
-    string Host { get; set; }
-    string Password { get; set; }
-    string Username { get; set; }
-    int Port { get; set; }
-
-    string GetConnectionString(string database_name);
+    string Host { get; }
+    string Password { get; }
+    string Username { get; }
 }
