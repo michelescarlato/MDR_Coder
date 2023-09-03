@@ -3,9 +3,9 @@
 namespace MDR_Coder;
 
 [Table("sf.source_parameters")]
-public class Source 
+public class SourceX
 {
-    public int? id { get; set; }
+    public int id { get; set; }
     public string? source_type { get; }
     public int? preference_rating { get; set; }
     public string? database_name { get; set; }
@@ -38,6 +38,40 @@ public class Source
     public bool? has_object_rights { get; set; }
     public bool? has_object_pubmed_set { get; set; }
     public bool? has_object_bbmri_set { get; }
+}
+
+[Table("sf.source_parameters")]
+public class Source
+{
+    public int id { get; }
+    public string? source_type { get; }
+    public int? preference_rating { get; }
+    public string? database_name { get; }
+    public string? db_conn { get; set; }
+    public bool? has_study_tables { get; }
+    public bool? has_study_topics { get; }
+    public bool? has_study_conditions { get; }
+    public bool? has_study_features { get; }
+    public bool? has_study_iec{ get; }
+    public bool? has_study_people{ get; }
+    public bool? has_study_organisations{ get; }
+    public bool? has_study_references { get; }
+    public bool? has_study_relationships { get; }
+    public bool? has_study_countries { get; }
+    public bool? has_study_locations { get; }
+    public string? study_iec_storage_type { get; }
+    public bool? has_object_datasets { get; }
+    public bool? has_object_instances { get; }
+    public bool? has_object_dates { get; }
+    public bool? has_object_descriptions { get; }
+    public bool? has_object_identifiers { get; }
+    public bool? has_object_people { get; }
+    public bool? has_object_organisations { get; }
+    public bool? has_object_topics { get; }
+    public bool? has_journal_details { get; }
+    public bool? has_object_rights { get; }
+    public bool? has_object_relationships { get; }
+
 }
 
 

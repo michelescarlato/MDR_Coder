@@ -69,7 +69,7 @@ public class Coder
 
         // If pubmed and publisher updates requested, do these updates first.
         
-        if (opts.RecodePublishers > 0 && source.has_object_pubmed_set is true)
+        if (opts.RecodePublishers > 0 && source.has_journal_details is true)
         {
             cb.ObtainPublisherInformation();
             cb.ApplyPublisherData();
@@ -81,34 +81,37 @@ public class Coder
         {
             if (source.has_study_tables is true)
             {
-                cb.UpdateStudyIdentifiers();
-                if (source.has_study_people is true)
-                {
-                    cb.UpdateStudyPeople(); 
-                }
+                cb.UpdateStudyIdentifiers();                
                 if (source.has_study_organisations is true)
                 {
                     cb.UpdateStudyOrgs();
                 }
-
-                cb.UpdateDataObjectOrgs();
+                if (source.has_study_people is true)
+                {
+                    cb.UpdateStudyPeople(); 
+                }
+                cb.UpdateDataObjectOrgs();                
                 cb.UpdateObjectInstanceOrgs();      
             }
-            
-            if (source.has_object_pubmed_set is true)
+            else
             {
                 cb.UpdateDataObjectOrgs();
-                cb.UpdateObjectInstanceOrgs(); 
-                
-                cb.UpdateObjectIdentifiers();
-                cb.UpdateObjectPeople();
-                cb.UpdateObjectOrganisations();
-            }
-
-            if (source.has_object_bbmri_set is true)
-            {
-                cb.UpdateDataObjectOrgs();
-                cb.UpdateObjectIdentifiers();
+                if (source.has_object_identifiers is true)
+                {
+                    cb.UpdateObjectIdentifiers();
+                }
+                if (source.has_object_instances is true)
+                {
+                    cb.UpdateObjectInstanceOrgs(); 
+                }
+                if (source.has_object_people is true)
+                {
+                    cb.UpdateObjectPeople();
+                }
+                if (source.has_object_organisations is true)
+                {
+                    cb.UpdateObjectOrganisations();
+                }
             }
         }
         

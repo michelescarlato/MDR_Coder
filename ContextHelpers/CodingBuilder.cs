@@ -22,7 +22,7 @@ namespace MDR_Coder
         {
             _source = source;
             connString = source.db_conn ?? "";
-            source_id = source.id ?? 0;
+            source_id = source.id;
             _logging_helper = logging_helper;
             bool testDataOnly = opts.ReCodeTestDataOnly;
             
