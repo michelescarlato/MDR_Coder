@@ -50,7 +50,7 @@ namespace MDR_Coder
 
             sql_string = @"CREATE SERVER IF NOT EXISTS context "
                          + @" FOREIGN DATA WRAPPER postgres_fdw
-                             OPTIONS (host '{host}', dbname 'context', port '5432');";
+                             OPTIONS (host '192.168.129.14', dbname 'context', port '5432');";
             conn.Execute(sql_string);
 
             sql_string = @"CREATE USER MAPPING IF NOT EXISTS FOR CURRENT_USER
