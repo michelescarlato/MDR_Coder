@@ -1,4 +1,5 @@
 ﻿using Dapper;
+using Microsoft.Extensions.Configuration;
 using Npgsql;
 
 namespace MDR_Coder
@@ -37,13 +38,19 @@ namespace MDR_Coder
         {
             using var conn = new NpgsqlConnection(connString);
             
+            var config = new ConfigurationBuilder()
+                .SetBasePath(Directory.GetCurrentDirectory())
+                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+                .Build();
+            var host = config.GetValue<string>("host");
+            
             string sql_string = @"CREATE EXTENSION IF NOT EXISTS postgres_fdw
                                      schema sd";   // any schema will do
             conn.Execute(sql_string);
 
             sql_string = @"CREATE SERVER IF NOT EXISTS context "
                          + @" FOREIGN DATA WRAPPER postgres_fdw
-                             OPTIONS (host 'localhost', dbname 'context', port '5432');";
+                             OPTIONS (host '{host}', dbname 'context', port '5432');";
             conn.Execute(sql_string);
 
             sql_string = @"CREATE USER MAPPING IF NOT EXISTS FOR CURRENT_USER
