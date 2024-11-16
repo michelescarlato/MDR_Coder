@@ -23,7 +23,7 @@ public class Coder
             if (source is not null)
             {
                 _loggingHelper.OpenLogFile(source.database_name!);
-                _loggingHelper.LogHeader("STARTING CODER");
+                _loggingHelper.LogHeader("STARTING CODER-with-host-fix");
                 _loggingHelper.LogCommandLineParameters(opts);
                 CodeData(source, opts);
             }
