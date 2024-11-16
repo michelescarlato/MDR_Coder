@@ -22,7 +22,7 @@ namespace MDR_Coder
         public CodingBuilder(Source source, Options opts, ILoggingHelper logging_helper)
         {
             _source = source;
-            connString = source.db_conn ?? "";
+            connString = (source.db_conn ?? "") + ";SslMode=Disable";
             source_id = source.id;
             _logging_helper = logging_helper;
             bool testDataOnly = opts.ReCodeTestDataOnly;
