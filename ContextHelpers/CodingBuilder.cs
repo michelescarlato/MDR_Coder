@@ -63,7 +63,7 @@ namespace MDR_Coder
                      IMPORT FOREIGN SCHEMA ctx
                      FROM SERVER context 
                      INTO context_ctx;";
-            conn.Execute(sql_string);
+            //conn.Execute(sql_string);
 
             sql_string = @"DROP SCHEMA IF EXISTS context_lup cascade;
                      CREATE SCHEMA context_lup; 
