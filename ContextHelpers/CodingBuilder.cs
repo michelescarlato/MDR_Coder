@@ -52,7 +52,10 @@ namespace MDR_Coder
                          + @" FOREIGN DATA WRAPPER postgres_fdw
                              OPTIONS (host '127.0.0.1', dbname 'context', port '5432');";
             conn.Execute(sql_string);
-
+            
+            Console.WriteLine("The user is " + creds.Username);
+            Console.WriteLine("The password is " + creds.Password);
+            
             sql_string = @"CREATE USER MAPPING IF NOT EXISTS FOR CURRENT_USER
                      SERVER context 
                      OPTIONS (user '" + creds.Username + "', password '" + creds.Password + "');";
