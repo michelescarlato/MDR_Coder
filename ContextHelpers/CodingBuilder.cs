@@ -50,7 +50,7 @@ namespace MDR_Coder
 
             sql_string = @"CREATE SERVER IF NOT EXISTS context "
                          + @" FOREIGN DATA WRAPPER postgres_fdw
-                             OPTIONS (host '192.168.129.14', dbname 'context', port '5432');";
+                             OPTIONS (host '127.0.0.1', dbname 'context', port '5432');";
             conn.Execute(sql_string);
 
             sql_string = @"CREATE USER MAPPING IF NOT EXISTS FOR CURRENT_USER
@@ -63,14 +63,14 @@ namespace MDR_Coder
                      IMPORT FOREIGN SCHEMA ctx
                      FROM SERVER context 
                      INTO context_ctx;";
-            //conn.Execute(sql_string);
+            conn.Execute(sql_string);
 
             sql_string = @"DROP SCHEMA IF EXISTS context_lup cascade;
                      CREATE SCHEMA context_lup; 
                      IMPORT FOREIGN SCHEMA lup
                      FROM SERVER context 
                      INTO context_lup;";
-            //conn.Execute(sql_string);
+            conn.Execute(sql_string);
         }
 
         public CodeEvent CreateCodingEvent(int codingId)
