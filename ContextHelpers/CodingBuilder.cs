@@ -70,7 +70,7 @@ namespace MDR_Coder
                      IMPORT FOREIGN SCHEMA lup
                      FROM SERVER context 
                      INTO context_lup;";
-            conn.Execute(sql_string);
+            //conn.Execute(sql_string);
         }
 
         public CodeEvent CreateCodingEvent(int codingId)
